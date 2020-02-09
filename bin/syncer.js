@@ -71,7 +71,7 @@ function prepare(dir, branch, branchOrigin, repositoryUri, subdir) {
     console.log(chalk.red(`The directory contains uncommited changes. Commit them and try again.`));
     process.exit(1);
   }
-  console.log(chalk.green(`Configuring ${dir.replace(/([^/\\]+)$/,'$1')}...`));
+  console.log(chalk.green(`Configuring '${dir.replace(/^.*([^/\\]+)$/,'$1')}'...`));
   if(repositoryUri) {
     if(state.repositoryUri) {
       console.log(chalk.yellow(`Change remote uri of '${branchOrigin}' to '${repositoryUri}'`));
@@ -174,8 +174,16 @@ function start(branch, repositoryUri) {
       cp.execSync('git add -A');
       cp.execSync(`git commit --amend -q -m "${comment}"`);
       console.log(`committed ${chalk.yellow(`${comment}`)}`);
-      cp.execSync(`git push ${branchOrigin} ${branch}:master --force -q`,{stdio:'ignore'});
-      console.log(`pushed to ${chalk.yellow(`${branchOrigin}`)}`);
+      try {
+        cp.execSync(`git push ${branchOrigin} ${branch}:master --force -q`,{stdio:'ignore'});
+        console.log(`pushed to ${chalk.yellow(`${branchOrigin}`)}`);
+      } catch(e) {
+        console.log(chalk.red(`Failed to push changes.`))
+        console.log(chalk.red(`Perhaps, you've forgotten to configure server repositories with:`))
+        console.log(chalk.bold(`git config --local receive.denyCurrentBranch updateInstead`))
+        console.error(e);
+        quit()
+      }      
       committing = false;
     } else {
       if(commitRequest) {
@@ -204,21 +212,24 @@ function start(branch, repositoryUri) {
   .on('ready', () => console.log(chalk.green('Watching... Press Q to exit.')))
 
   // Exit
+  function quit() {
+    watcher.close()
+    .then(()=>{
+      process.chdir(state.dir)
+      cp.execSync('git checkout master');
+      for(let module of modules) {
+        process.chdir(path.join(state.dir, module));
+        cp.execSync('git checkout master');
+      }
+      process.exit();
+    })
+  }
   const readline = require('readline');
   readline.emitKeypressEvents(process.stdin);
   process.stdin.setRawMode(true);
   process.stdin.on('keypress', (str, key) => {
     if (key.name === 'q') {
-      watcher.close()
-      .then(()=>{
-        process.chdir(state.dir)
-        cp.execSync('git checkout master');
-        for(let module of modules) {
-          process.chdir(path.join(state.dir, module));
-          cp.execSync('git checkout master');
-        }
-        process.exit();
-      })
+      quit()
     }
   });
 }
