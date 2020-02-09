@@ -15,10 +15,10 @@ let command;
 const program = require('commander');
 
 program.version(packageJson.version)
-  .arguments('<command>')
-  .usage(`${chalk.green('<command>')} [options]`)
-  .action(name => {
-    command = name;
+  .arguments('<branch> [repository-uri]')
+  .usage(`create a ${chalk.yellow('<branch>')} which will be syncronized with repository at ${chalk.yellow('<repository-uri>')} (you can specify the uri only once)`)
+  .action((branch, repositoryUri, options) => {
+    start(branch, repositoryUri);
   })
   .allowUnknownOption()
   .on('--help',()=>{
@@ -42,15 +42,7 @@ program.version(packageJson.version)
     console.log(`   ,where N is a number of commits to squash stating from the current.`);
     console.log(`   This command opens interactive dialog for squashing commits.`);
   })
-
-program
-  .command('start <branch> [repository-uri]')
-  .description(`start watcher. Specify ${chalk.yellow('<repository-uri>')} for the first time.`)
-  .action(function(branch, repositoryUri, options) {
-    start(branch, repositoryUri);
-  })
-
-program.parse(process.argv);
+  .parse(process.argv);
 
 function start(branch, repositoryUri) {
   // Preparing state
