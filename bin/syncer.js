@@ -21,6 +21,18 @@ program.version(packageJson.version)
     command = name;
   })
   .allowUnknownOption()
+  .on('--help',()=>{
+    console.log(chalk.green(`- Configure server: `))
+    console.log(`   Run the following command in the remote repository: `);
+    console.log(chalk.yellow(`    'git config --local receive.denyCurrentBranch updateInstead'`));
+    console.log(`   Consider this repository as a ${chalk.red('read-only')} folder.`);
+    console.log(`   ${chalk.yellow('ATENTION')}: git version should be >= 2.16.x`);
+    console.log(`   ${chalk.red('WARNING')}: Do not commit or push any changes from this repository`);
+    console.log(``);
+    console.log(chalk.green(`- Pull changes to master as a single(squashed) commit: `));
+    console.log(`   Run`);
+    console.log(chalk.yellow(`    'git checkout master && git merge --squash -m "<commit message>" <gsync_branch>'`));
+  })
 
 program
   .command('start <branch> [repository-uri]')
@@ -29,30 +41,11 @@ program
     start(branch, repositoryUri);
   })
 
-program 
-  .command('install <branch>')
-  .description(`install syncer stuff to .git folder`)
-  .option('-s, --server', "configure .git folder as remote (local by default)")
-  .action(function(branch, options) {
-    if(options.server) {
-      installServer(branch)
-    } else {
-      installLocal(branch)
-    }    
-  })
-
-program
-  .command('uninstall <branch>')
-  .description(`${chalk.yellow('(server only)')} uninstall syncer stuff from host's .git repo`)
-  .action(function(options) {
-    uninstall()
-  })
-
 program.parse(process.argv);
 
 function start(branch, repositoryUri) {
   // Preparing state
-  console.log(chalk.green(`Starting syncer for '${branch}' branch...`));
+  console.log(chalk.green(`Starting gsync@${packageJson.version} for '${branch}' branch...`));
   function check(cmd) {
     try { 
       return cp.execSync(`git ${cmd}`,{stdio:['pipe','pipe','ignore']}).toString().replace(/(^\s*|\s*$)/g,'')
@@ -88,7 +81,7 @@ function start(branch, repositoryUri) {
     }
   } else {
     if(state.repositoryUri) {
-      console.log(chalk.yellow(`Remote uri of ${branchOrigin} is set to ${chalk.green(state.repositoryUri)}`));
+      console.log(chalk.yellow(`Remote uri of ${branchOrigin} is '${state.repositoryUri}'`));
     } else {
       console.log(chalk.red(`Remote target is not configured. Specify repository URI and run command again.`));
       process.exit(1);
@@ -143,15 +136,20 @@ function start(branch, repositoryUri) {
   // Commit request
   let committing = false;
   let commitRequest;
+  let firstCommit = true;
   function commit() {
     if(!committing) {
       committing = true;
       const comment = `${branch}:${new Date().toISOString()}`
       cp.execSync('git add -A');
-      cp.execSync(`git commit --amend -q -m "${comment}"`);
-      //cp.execSync(`git push ${branchOrigin} ${branch}`);
+      cp.execSync(`git commit ${firstCommit ? '' : '--amend'} -q -m "${comment}"`);
       console.log(`committed ${chalk.yellow(`${comment}`)}`);
+      cp.execSync(`git push ${branchOrigin} ${branch}:master ${firstCommit ? '' : '--force'} -q`,{stdio:'ignore'});
+      console.log(`pushed to ${chalk.green(`${branchOrigin}`)}`);
       committing = false;
+      if(firstCommit) {
+        firstCommit = false;
+      }
     } else {
       if(commitRequest) {
         clearTimeout(commitRequest);
@@ -171,15 +169,4 @@ function start(branch, repositoryUri) {
     commit();
   })
   .on('ready', () => console.log(chalk.green('Watching... ')))
-}
-function installLocal(branch) {
-  // Preparing
-  console.log(`Installing syncer for ${chalk.green(`${branch}`)} branch...`);
-
-}
-function installServer() {
-
-}
-function uninstall() {
-
 }
