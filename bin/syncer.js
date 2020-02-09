@@ -57,7 +57,7 @@ function check(cmd) {
 function prepare(dir, branch, repositoryUri, subdir) {
   dir = subdir ? path.join(dir, subdir): dir;
   repositoryUri = repositoryUri ? (subdir ? path.join(repositoryUri, subdir) : repositoryUri) : "";
-  
+
   process.chdir(dir);
   let branchOrigin = `${branch}_origin`;
   let state = {
@@ -71,7 +71,7 @@ function prepare(dir, branch, repositoryUri, subdir) {
     console.log(chalk.red(`The directory contains uncommited changes. Commit them and try again.`));
     process.exit(1);
   }
-  console.log(chalk.yellow(`Configuring...`));
+  console.log(chalk.green(`Configuring ${dir.replace(/[^/\\]+$/,'$1')}...`));
   if(repositoryUri) {
     if(state.repositoryUri) {
       console.log(chalk.yellow(`Change remote uri of '${branchOrigin}' to '${repositoryUri}'`));
@@ -151,7 +151,6 @@ function start(branch, repositoryUri) {
   } catch(e) {}
   if(modules.length) {
     console.log(chalk.yellow(`Found submodules: ${modules.join(', ')}.`));
-    console.log(chalk.yellow(`${chalk.red('Warning')}: gsync will checkout ${branch} at submodules. You will have to checkout 'master' manually`));
     repositories.push(...(modules.map(x=>path.join(state.dir, x))));
   }
   prepare(state.dir, branch, repositoryUri);
@@ -190,12 +189,14 @@ function start(branch, repositoryUri) {
     ignored: ['node_modules', '.git'],
     ignoreInitial: true
   })
-  .on('all', (event, path) => {
-    for(let dir of repositories) {
-      if(path.startsWith(dir)) {
-        commit(dir);
+  .on('all', (event, p) => {
+    for(let module of modules) {
+      if(p.startsWith(`${module}${path.sep}`)) {
+        commit(path.join(state.dir,module));
+        return;
       }
-    }    
+    } 
+    commit(state.dir);  
   })
   .on('ready', () => console.log(chalk.green('Watching... Press Q to exit.')))
 
