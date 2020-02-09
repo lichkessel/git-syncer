@@ -54,7 +54,10 @@ function check(cmd) {
   }
 }
 
-function prepare(dir, branch, repositoryUri) {
+function prepare(dir, branch, repositoryUri, subdir) {
+  dir = subdir ? path.join(dir, subdir): dir;
+  repositoryUri = repositoryUri ? (subdir ? path.join(repositoryUri, subdir) : repositoryUri) : "";
+  
   process.chdir(dir);
   let branchOrigin = `${branch}_origin`;
   let state = {
@@ -153,7 +156,7 @@ function start(branch, repositoryUri) {
   }
   prepare(state.dir, branch, repositoryUri);
   for(let module of modules) {
-    prepare(path.join(state.dir, module), branch, path.join(repositoryUri, module));
+    prepare(state.dir, branch, repositoryUri, module);
   }
 
   console.log(chalk.yellow(`Installing watcher on '${state.dir}'...`));
