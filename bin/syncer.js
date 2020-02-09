@@ -136,7 +136,7 @@ function start(branch, repositoryUri) {
   // Commit request
   let committing = false;
   let commitRequest;
-  let firstCommit = true;
+  let firstCommit = false;
   function commit() {
     if(!committing) {
       committing = true;
