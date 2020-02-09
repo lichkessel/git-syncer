@@ -131,11 +131,11 @@ function prepare(dir, branch, repositoryUri) {
 function start(branch, repositoryUri) {
   // Preparing state
   console.log(chalk.green(`Starting gsync@${packageJson.version} for '${branch}' branch...`));
-  let repositories = [process.cwd()];
-  let modules = [];
   let state = {
     dir : check('git rev-parse --show-toplevel')
   }
+  let repositories = [state.dir];
+  let modules = [];
   try {
     modules = cp.execSync('git config --file .gitmodules --get-regexp path')
       .toString()
@@ -149,11 +149,11 @@ function start(branch, repositoryUri) {
   if(modules.length) {
     console.log(chalk.yellow(`Found submodules: ${modules.join(', ')}.`));
     console.log(chalk.yellow(`${chalk.red('Warning')}: gsync will checkout ${branch} at submodules. You will have to checkout 'master' manually`));
-    repositories.push(...(modules.map(x=>path.join(process.cwd(), x))));
+    repositories.push(...(modules.map(x=>path.join(state.dir, x))));
   }
-  prepare(process.cwd(), branch, repositoryUri);
+  prepare(state.dir, branch, repositoryUri);
   for(let module of modules) {
-    prepare(path.join(process.cwd(), module), branch, path.join(repositoryUri, module));
+    prepare(path.join(state.dir, module), branch, path.join(repositoryUri, module));
   }
 
   console.log(chalk.yellow(`Installing watcher on '${state.dir}'...`));
@@ -182,7 +182,7 @@ function start(branch, repositoryUri) {
 
   // Watcher
   let commitJob;
-  chokidar.watch('.', {
+  let watcher = chokidar.watch('.', {
     cwd: state.dir,
     ignored: ['node_modules', '.git'],
     ignoreInitial: true
@@ -194,5 +194,24 @@ function start(branch, repositoryUri) {
       }
     }    
   })
-  .on('ready', () => console.log(chalk.green('Watching... ')))
+  .on('ready', () => console.log(chalk.green('Watching... Press Q to exit.')))
+
+  // Exit
+  const readline = require('readline');
+  readline.emitKeypressEvents(process.stdin);
+  process.stdin.setRawMode(true);
+  process.stdin.on('keypress', (str, key) => {
+    if (key.name === 'q') {
+      watcher.close()
+      .then(()=>{
+        process.chdir(state.dir)
+        cp.execSync('git checkout master');
+        for(let module of modules) {
+          process.chdir(path.join(state.dir, module));
+          cp.execSync('git checkout master');
+        }
+        process.exit();
+      })
+    }
+  });
 }
