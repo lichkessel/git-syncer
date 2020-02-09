@@ -65,7 +65,7 @@ function start(branch, repositoryUri) {
   let state = {
     branch : check('rev-parse --abbrev-ref HEAD'),
     dir : check('rev-parse --show-toplevel'),
-    containsUncommitedChanges : check('diff --name-only HEAD'),
+    containsUncommitedChanges : check('git status --porcelain'), //diff --name-only HEAD
     repositoryUri : check(`config --get remote.${branchOrigin}.url`),
     remoteNameWhichBranchTracks : check(`config --get branch.${branch}.remote`),
     branchExists : check(`rev-parse --verify ${branch}`,{stdio:['pipe','pipe','ignore']})
