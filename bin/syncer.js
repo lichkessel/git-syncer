@@ -22,6 +22,8 @@ program.version(packageJson.version)
   })
   .allowUnknownOption()
   .on('--help',()=>{
+    console.log(`   ${chalk.blue('INFO')}: normally, your gsync branch should contain only one commit`);
+    console.log(``);
     console.log(chalk.green(`- Configure server: `))
     console.log(`   Run the following command in the remote repository: `);
     console.log(chalk.yellow(`    'git config --local receive.denyCurrentBranch updateInstead'`));
@@ -29,9 +31,15 @@ program.version(packageJson.version)
     console.log(`   ${chalk.yellow('ATENTION')}: git version should be >= 2.16.x`);
     console.log(`   ${chalk.red('WARNING')}: Do not commit or push any changes from this repository`);
     console.log(``);
-    console.log(chalk.green(`- Pull changes to master as a single(squashed) commit: `));
+    console.log(chalk.green(`- Push changes to master as a single(squashed) commit: `));
     console.log(`   Run`);
     console.log(chalk.yellow(`    'git checkout master && git merge --squash -m "<commit message>" <gsync_branch>'`));
+    console.log(``);
+    console.log(chalk.green(`- Squash all commits in the branch: `));
+    console.log(`   Run`);
+    console.log(chalk.yellow(`    'git rebase -i HEAD~N'`));
+    console.log(`   ,where N is a number of commits to squash stating from the current.`);
+    console.log(`   This command opens interactive dialog for squashing commits.`);
   })
 
 program
@@ -88,7 +96,7 @@ function start(branch, repositoryUri) {
     }
   }
   console.log(chalk.yellow(`Fetching changes from '${branchOrigin}' at '${state.repositoryUri || repositoryUri}'...`));
-  cp.execSync(`git fetch ${branchOrigin}`);
+  cp.execSync(`git fetch ${branchOrigin}`,{stdio:'ignore'});
 
   // Pull changes from remote
 
@@ -136,20 +144,16 @@ function start(branch, repositoryUri) {
   // Commit request
   let committing = false;
   let commitRequest;
-  let firstCommit = false;
   function commit() {
     if(!committing) {
       committing = true;
-      const comment = `${branch}:${new Date().toISOString()}`
+      const comment = `gsync:auto:commit:${branch}`
       cp.execSync('git add -A');
-      cp.execSync(`git commit ${firstCommit ? '' : '--amend'} -q -m "${comment}"`);
+      cp.execSync(`git commit --amend -q -m "${comment}"`);
       console.log(`committed ${chalk.yellow(`${comment}`)}`);
-      cp.execSync(`git push ${branchOrigin} ${branch}:master ${firstCommit ? '' : '--force'} -q`,{stdio:'ignore'});
+      cp.execSync(`git push ${branchOrigin} ${branch}:master --force -q`,{stdio:'ignore'});
       console.log(`pushed to ${chalk.green(`${branchOrigin}`)}`);
       committing = false;
-      if(firstCommit) {
-        firstCommit = false;
-      }
     } else {
       if(commitRequest) {
         clearTimeout(commitRequest);
