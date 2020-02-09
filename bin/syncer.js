@@ -46,20 +46,19 @@ program.version(packageJson.version)
   })
   .parse(process.argv);
 
+function check(cmd) {
+  try { 
+    return cp.execSync(`${cmd}`,{stdio:['pipe','pipe','ignore']}).toString().replace(/(^\s*|\s*$)/g,'')
+  } catch(e) {
+    return false;
+  }
+}
+
 function prepare(dir, branch, repositoryUri) {
   process.chdir(dir);
-
-  function check(cmd) {
-    try { 
-      return cp.execSync(`${cmd}`,{stdio:['pipe','pipe','ignore']}).toString().replace(/(^\s*|\s*$)/g,'')
-    } catch(e) {
-      return false;
-    }
-  }
   let branchOrigin = `${branch}_origin`;
   let state = {
     branch : check('git rev-parse --abbrev-ref HEAD'),
-    dir : check('git rev-parse --show-toplevel'),
     containsUncommitedChanges : check('git status --porcelain'), //git diff --name-only HEAD
     repositoryUri : check(`git config --get remote.${branchOrigin}.url`),
     remoteNameWhichBranchTracks : check(`git config --get branch.${branch}.remote`),
@@ -134,6 +133,9 @@ function start(branch, repositoryUri) {
   console.log(chalk.green(`Starting gsync@${packageJson.version} for '${branch}' branch...`));
   let repositories = [process.cwd()];
   let modules = [];
+  let state = {
+    dir : check('git rev-parse --show-toplevel')
+  }
   try {
     modules = cp.execSync('git config --file .gitmodules --get-regexp path')
       .toString()
