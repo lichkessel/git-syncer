@@ -112,17 +112,22 @@ function start(branch, repositoryUri) {
     }
   }
 
-  if(!state.branchExists) { 
+  if(state.branchExists) {
     try {
-      cp.execSync(`git branch ${branch} -t ${branchOrigin}/master`,{stdio:'ignore'});
-      console.log(chalk.yellow(`Branch '${branch}' created.`))
-    } catch(e) {
-      console.error(e);
-      console.log(chalk.red(`Error: couldn't create branch '${branch}'.`))
-      process.exit(1)
-    }
+      cp.execSync(`git checkout master`,{stdio:'ignore'});
+      cp.execSync(`git branch -D ${branch}`,{stdio:'ignore'});
+    } catch(e) {}
   }
 
+  try {
+    cp.execSync(`git branch ${branch} -t ${branchOrigin}/master`,{stdio:'ignore'});
+    console.log(chalk.yellow(`Branch '${branch}' re-created.`))
+  } catch(e) {
+    console.error(e);
+    console.log(chalk.red(`Error: couldn't create branch '${branch}'.`))
+    process.exit(1)
+  }
+  
   try {
     cp.execSync(`git branch -u ${branchOrigin}/master ${branch}`);
     console.log(chalk.yellow(`Branch '${branch}' origin set to '${branchOrigin}/master'.`))
