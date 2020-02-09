@@ -1,10 +1,11 @@
 {
   "name": "@seerious/gsync",
-  "version": "1.0.20",
+  "version": "1.0.21",
   "author": "Alexander Nedossekin <anedosekin@gmail.com>",
   "description": "Uses git and javascript to broadcast changes",
   "scripts": {
-    "start": "syncer start"
+    "start": "syncer start",
+    "gsync": "node ./bin/syncer.js"
   },
   "repository": {
     "type": "git",

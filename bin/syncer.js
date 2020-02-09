@@ -16,31 +16,33 @@ const program = require('commander');
 
 program.version(packageJson.version)
   .arguments('<branch> [repository-uri]')
-  .usage(`create a ${chalk.yellow('<branch>')} which will be syncronized with repository at ${chalk.yellow('<repository-uri>')} (you can specify the uri only once)`)
+  .usage(`creates a ${chalk.yellow('<branch>')} which will be syncronized with repository at ${chalk.yellow('<repository-uri>')} (you can specify the uri only once)`)
   .action((branch, repositoryUri, options) => {
     start(branch, repositoryUri);
   })
   .allowUnknownOption()
   .on('--help',()=>{
-    console.log(`   ${chalk.blue('WARNING')}: do not commit to gsync branch. All commits which are not pushed to remote will be deleted`);
-    console.log(`   ${chalk.blue('INFO')}: normally, your gsync branch should contain only one commit`);
     console.log(``);
-    console.log(chalk.green(`- Configure server: `))
-    console.log(`   Run the following command in the remote repository: `);
-    console.log(chalk.yellow(`    'git config --local receive.denyCurrentBranch updateInstead'`));
-    console.log(`   Consider this repository as a ${chalk.red('read-only')} folder.`);
-    console.log(`   ${chalk.yellow('ATENTION')}: git version should be >= 2.16.x`);
-    console.log(`   ${chalk.red('WARNING')}: Do not commit or push any changes from this repository`);
+    console.log(`${chalk.red('WARNING')}: ${chalk.bold('do not commit to gsync branch.')}`);
+    console.log(`All commits which are not pushed to remote will be deleted`);
+    console.log(`${chalk.blue('INFO')}: normally, your gsync branch should contain only one commit`);
     console.log(``);
-    console.log(chalk.green(`- Push changes to master as a single(squashed) commit: `));
-    console.log(`   Run`);
-    console.log(chalk.yellow(`    'git checkout master && git merge --squash -m "<commit message>" <gsync_branch>'`));
+    console.log(chalk.blue(`- Configure server: `))
+    console.log(`  In the remote repository: `);
+    console.log(chalk.bold(`  git config --local receive.denyCurrentBranch updateInstead`));
+    console.log(`  Consider this repository as ${chalk.red('read-only')}.`);
+    console.log(`  Make sure this repository has ${chalk.bold('master')} branch checked out:`);
+    console.log(chalk.bold(`  git status`));
+    console.log(`  ${chalk.yellow('ATENTION')}: git version should be >= 2.16.x`);
+    console.log(`  ${chalk.red('WARNING')}: Do not use this server repository other than for gsync`);
     console.log(``);
-    console.log(chalk.green(`- Squash all commits in the branch: `));
-    console.log(`   Run`);
-    console.log(chalk.yellow(`    'git rebase -i HEAD~N'`));
-    console.log(`   ,where N is a number of commits to squash stating from the current.`);
-    console.log(`   This command opens interactive dialog for squashing commits.`);
+    console.log(chalk.blue(`- Push changes to master as a single(squashed) commit: `));
+    console.log(chalk.bold(`  git checkout master && git merge --squash -m "<commit message>" <gsync_branch>`));
+    console.log(``);
+    console.log(chalk.blue(`- Squash all commits in the branch: `));
+    console.log(chalk.bold(`  git rebase -i HEAD~N`));
+    console.log(`  where N is a number of commits to squash stating from the current.`);
+    console.log(`  This command opens interactive dialog for squashing commits.`);
   })
   .parse(process.argv);
 
