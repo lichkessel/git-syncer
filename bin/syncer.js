@@ -146,7 +146,7 @@ function start(branch, repositoryUri) {
   } catch(e) {}
   if(modules.length) {
     console.log(chalk.yellow(`Found submodules: ${modules.join(', ')}.`));
-    console.log(`${chalk.red(`Warning`)}: gsync will checkout ${branch} at submodules. You will have to checkout 'master' manually`));
+    console.log(chalk.yellow(`${chalk.red('Warning')}: gsync will checkout ${branch} at submodules. You will have to checkout 'master' manually`));
     repositories.push(...(modules.map(x=>path.join(process.cwd(), x))));
   }
   prepare(process.cwd(), branch, repositoryUri);
