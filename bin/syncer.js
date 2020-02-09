@@ -46,7 +46,7 @@ program.version(packageJson.version)
   })
   .parse(process.argv);
 
-function prepare(dir, branch) {
+function prepare(dir, branch, repositoryUri) {
   process.chdir(dir);
 
   function check(cmd) {
@@ -146,13 +146,14 @@ function start(branch, repositoryUri) {
   } catch(e) {}
   if(modules.length) {
     console.log(chalk.yellow(`Found submodules: ${modules.join(', ')}.`));
-    console.log(chalk.red(`Warning: gsync will checkout ${branch} at submodules. You will have to checkout 'master' manually`));
+    console.log(`${chalk.red(`Warning`)}: gsync will checkout ${branch} at submodules. You will have to checkout 'master' manually`));
     repositories.push(...(modules.map(x=>path.join(process.cwd(), x))));
   }
-  
-  for(let dir of repositories) {
-    prepare(dir, branch);
+  prepare(process.cwd(), branch, repositoryUri);
+  for(let module of modules) {
+    prepare(path.join(process.cwd(), module), branch, path.join(repositoryUri, module));
   }
+
   console.log(chalk.yellow(`Installing watcher on '${state.dir}'...`));
 
   // Commit request
