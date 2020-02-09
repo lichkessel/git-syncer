@@ -114,7 +114,7 @@ function start(branch, repositoryUri) {
 
   if(!state.branchExists) { 
     try {
-      cp.execSync(`git branch ${branch}`,{stdio:'ignore'});
+      cp.execSync(`git branch ${branch} -t ${branchOrigin}/master`,{stdio:'ignore'});
       console.log(chalk.yellow(`Branch '${branch}' created.`))
     } catch(e) {
       console.error(e);
