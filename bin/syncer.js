@@ -22,6 +22,7 @@ program.version(packageJson.version)
   })
   .allowUnknownOption()
   .on('--help',()=>{
+    console.log(`   ${chalk.blue('WARNING')}: do not commit to gsync branch. All commits which are not pushed to remote will be deleted`);
     console.log(`   ${chalk.blue('INFO')}: normally, your gsync branch should contain only one commit`);
     console.log(``);
     console.log(chalk.green(`- Configure server: `))
@@ -121,30 +122,31 @@ function start(branch, repositoryUri) {
 
   try {
     cp.execSync(`git branch ${branch} -t ${branchOrigin}/master`,{stdio:'ignore'});
-    console.log(chalk.yellow(`Branch '${branch}' re-created.`))
+    console.log(chalk.yellow(`Branch '${branch}' with origin set to '${branchOrigin}/master' re-created.`))
   } catch(e) {
     console.error(e);
     console.log(chalk.red(`Error: couldn't create branch '${branch}'.`))
     process.exit(1)
   }
-  
+
+  /*
   try {
     cp.execSync(`git branch -u ${branchOrigin}/master ${branch}`);
     console.log(chalk.yellow(`Branch '${branch}' origin set to '${branchOrigin}/master'.`))
   } catch(e) {
     console.error(e);
-  }
+  }*/
 
   try {
     cp.execSync(`git checkout ${branch}`, {stdio:'ignore'}); 
-    console.log(`Branch '${chalk.green(branch)}' checked out.`)
+    console.log(chalk.yellow(`Branch '${branch}' checked out.`))
   } catch(e) {
     console.log(chalk.red(`Error: can not checkout ${branch} branch to push changes`));
     rollback();
     process.exit(1);
   }
 
-  console.log(`Installing watcher on '${chalk.green(`${state.dir}`)}'...`);
+  console.log(chalk.yellow(`Installing watcher on '${state.dir}'...`));
 
   // Commit request
   let committing = false;
@@ -157,7 +159,7 @@ function start(branch, repositoryUri) {
       cp.execSync(`git commit --amend -q -m "${comment}"`);
       console.log(`committed ${chalk.yellow(`${comment}`)}`);
       cp.execSync(`git push ${branchOrigin} ${branch}:master --force -q`,{stdio:'ignore'});
-      console.log(`pushed to ${chalk.green(`${branchOrigin}`)}`);
+      console.log(`pushed to ${chalk.yellow(`${branchOrigin}`)}`);
       committing = false;
     } else {
       if(commitRequest) {
