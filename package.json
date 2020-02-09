@@ -1,6 +1,6 @@
 {
   "name": "@seerious/gsync",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "author": "Alexander Nedossekin <anedosekin@gmail.com>",
   "description": "Uses git and javascript to broadcast changes",
   "scripts": {
