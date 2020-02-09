@@ -54,12 +54,12 @@ function check(cmd) {
   }
 }
 
-function prepare(dir, branch, repositoryUri, subdir) {
+function prepare(dir, branch, branchOrigin, repositoryUri, subdir) {
   dir = subdir ? path.join(dir, subdir): dir;
   repositoryUri = repositoryUri ? (subdir ? path.join(repositoryUri, subdir) : repositoryUri) : "";
 
   process.chdir(dir);
-  let branchOrigin = `${branch}_origin`;
+  
   let state = {
     branch : check('git rev-parse --abbrev-ref HEAD'),
     containsUncommitedChanges : check('git status --porcelain'), //git diff --name-only HEAD
@@ -71,7 +71,7 @@ function prepare(dir, branch, repositoryUri, subdir) {
     console.log(chalk.red(`The directory contains uncommited changes. Commit them and try again.`));
     process.exit(1);
   }
-  console.log(chalk.green(`Configuring ${dir.replace(/[^/\\]+$/,'$1')}...`));
+  console.log(chalk.green(`Configuring ${dir.replace(/([^/\\]+)$/,'$1')}...`));
   if(repositoryUri) {
     if(state.repositoryUri) {
       console.log(chalk.yellow(`Change remote uri of '${branchOrigin}' to '${repositoryUri}'`));
@@ -137,6 +137,7 @@ function start(branch, repositoryUri) {
   let state = {
     dir : check('git rev-parse --show-toplevel')
   }
+  let branchOrigin = `${branch}_origin`;
   let repositories = [state.dir];
   let modules = [];
   try {
@@ -153,9 +154,11 @@ function start(branch, repositoryUri) {
     console.log(chalk.yellow(`Found submodules: ${modules.join(', ')}.`));
     repositories.push(...(modules.map(x=>path.join(state.dir, x))));
   }
-  prepare(state.dir, branch, repositoryUri);
+
+  // Preparing repositories
+  prepare(state.dir, branch, branchOrigin, repositoryUri);
   for(let module of modules) {
-    prepare(state.dir, branch, repositoryUri, module);
+    prepare(state.dir, branch, branchOrigin, repositoryUri, module);
   }
 
   console.log(chalk.yellow(`Installing watcher on '${state.dir}'...`));
