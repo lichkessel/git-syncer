@@ -17,8 +17,9 @@ const program = require('commander');
 program.version(packageJson.version)
   .arguments('<branch> [repository-uri]')
   .usage(`creates a ${chalk.yellow('<branch>')} which will be syncronized with repository at ${chalk.yellow('<repository-uri>')} (you can specify the uri only once)`)
+  .option('-u, --update', 'updates your remote gsync repository')
   .action((branch, repositoryUri, options) => {
-    start(branch, repositoryUri);
+    start(branch, repositoryUri, options.update);
   })
   .allowUnknownOption()
   .on('--help',()=>{
@@ -43,6 +44,10 @@ program.version(packageJson.version)
     console.log(chalk.bold(`  git rebase -i HEAD~N`));
     console.log(`  where N is a number of commits to squash stating from the current.`);
     console.log(`  This command opens interactive dialog for squashing commits.`);
+    console.log(``);
+    console.log(chalk.blue(`Examples: `));
+    console.log(`gsync alexander rt.com:/var/www/html/alexander`);
+    console.log(`gsync alexander`);
   })
   .parse(process.argv);
 
@@ -54,7 +59,7 @@ function check(cmd) {
   }
 }
 
-function prepare(dir, branch, branchOrigin, repositoryUri, subdir) {
+function prepare(dir, branch, branchOrigin, update, repositoryUri, subdir) {
   dir = subdir ? path.join(dir, subdir): dir;
   repositoryUri = repositoryUri ? (subdir ? path.join(repositoryUri, subdir) : repositoryUri) : "";
 
@@ -71,7 +76,7 @@ function prepare(dir, branch, branchOrigin, repositoryUri, subdir) {
     console.log(chalk.red(`The directory contains uncommited changes. Commit them and try again.`));
     process.exit(1);
   }
-  console.log(chalk.green(`Configuring '${dir.replace(/^.*([^/\\]+)$/,'$1')}'...`));
+  console.log(chalk.green(`Configuring '${dir.replace(/^.*?([^/\\]+)$/,'$1')}'...`));
   if(repositoryUri) {
     if(state.repositoryUri) {
       console.log(chalk.yellow(`Change remote uri of '${branchOrigin}' to '${repositoryUri}'`));
@@ -88,50 +93,55 @@ function prepare(dir, branch, branchOrigin, repositoryUri, subdir) {
       process.exit(1);
     }
   }
-  console.log(chalk.yellow(`Fetching changes from '${branchOrigin}' at '${state.repositoryUri || repositoryUri}'...`));
-  cp.execSync(`git fetch ${branchOrigin}`,{stdio:'ignore'});
 
-  // Pull changes from remote
-
-  // Checkout branch
-  function rollback() {
-    try {
-      cp.execSync(`git checkout ${state.branch}`,{stdio:'ignore'});
-      console.log(chalk.blue(`Rolled back to '${state.branch}'`));
-    } catch(e) {
-      console.error(e);
-      console.log(chalk.red(`WARNING: could not roll back to '${state.branch}'. You have to do it manually.`))
-      process.exit(1);
-    }
-  }
+  try {
+    cp.execSync(`git checkout master`,{stdio:'ignore'});
+  } catch(e) {}
 
   if(state.branchExists) {
     try {
-      cp.execSync(`git checkout master`,{stdio:'ignore'});
       cp.execSync(`git branch -D ${branch}`,{stdio:'ignore'});
     } catch(e) {}
   }
 
-  try {
-    cp.execSync(`git branch ${branch} -t ${branchOrigin}/master`,{stdio:'ignore'});
-    console.log(chalk.yellow(`Branch '${branch}' with origin set to '${branchOrigin}/master' re-created.`))
-  } catch(e) {
-    console.error(e);
-    console.log(chalk.red(`Error: couldn't create branch '${branch}'.`))
-    process.exit(1)
-  }
-
-  try {
-    cp.execSync(`git checkout ${branch}`, {stdio:'ignore'}); 
-    console.log(chalk.yellow(`Branch '${branch}' checked out.`))
-  } catch(e) {
-    console.log(chalk.red(`Error: can not checkout ${branch} branch to push changes`));
-    rollback();
-    process.exit(1);
+  // Checkout branch
+  if(update) {
+    try {
+      cp.execSync(`git branch ${branch}`,{stdio:'ignore'});
+    } catch(e) {
+      console.log(chalk.red(`Error: can not create '${branch}'' branch`));
+      process.exit(1);
+    }
+    try {
+      cp.execSync(`git push -u ${branchOrigin} ${branch}:master --force`,{stdio:'ignore'});
+      cp.execSync(`git checkout ${branch}`, {stdio:'ignore'});
+      console.log(chalk.yellow(`Branch '${branchOrigin}/master' updated to recent 'master'.`));
+    } catch(e) {
+      console.log(chalk.red(`Error: can not checkout '${branch}'' branch to push changes`));
+      process.exit(1);
+    }    
+  } else {
+    console.log(chalk.yellow(`Fetching changes from '${branchOrigin}' at '${state.repositoryUri || repositoryUri}'...`));
+    cp.execSync(`git fetch ${branchOrigin}`,{stdio:'ignore'});
+    try {
+      cp.execSync(`git branch ${branch} -t ${branchOrigin}/master`,{stdio:'ignore'});
+      console.log(chalk.yellow(`Branch '${branch}' with origin set to '${branchOrigin}/master' re-created.`))
+    } catch(e) {
+      console.error(e);
+      console.log(chalk.red(`Error: couldn't create branch '${branch}'.`))
+      process.exit(1)
+    }
+    try {
+      cp.execSync(`git checkout ${branch}`, {stdio:'ignore'}); 
+      console.log(chalk.yellow(`Branch '${branch}' checked out.`))
+    } catch(e) {
+      console.log(chalk.red(`Error: can not checkout '${branch}'' branch to push changes`));
+      process.exit(1);
+    }
   }
 }
 
-function start(branch, repositoryUri) {
+function start(branch, repositoryUri, update) {
   // Preparing state
   console.log(chalk.green(`Starting gsync@${packageJson.version} for '${branch}' branch...`));
   let state = {
@@ -156,9 +166,9 @@ function start(branch, repositoryUri) {
   }
 
   // Preparing repositories
-  prepare(state.dir, branch, branchOrigin, repositoryUri);
+  prepare(state.dir, branch, branchOrigin, update, repositoryUri);
   for(let module of modules) {
-    prepare(state.dir, branch, branchOrigin, repositoryUri, module);
+    prepare(state.dir, branch, branchOrigin, update, repositoryUri, module);
   }
 
   console.log(chalk.yellow(`Installing watcher on '${state.dir}'...`));
