@@ -1,11 +1,10 @@
 {
   "name": "@seerious/gsync",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "author": "Alexander Nedossekin <anedosekin@gmail.com>",
   "description": "Uses git and javascript to broadcast changes",
   "scripts": {
-    "start": "syncer start",
-    "publish" : "npm publish --access public"
+    "start": "syncer start"
   },
   "repository": {
     "type": "git",
@@ -13,7 +12,7 @@
   },
   "license": "MIT",
   "bin": {
-    "syncer": "./bin/syncer.js"
+    "gsync": "./bin/syncer.js"
   },
   "devDependencies": {
     "git-hooks": "^1.1.10"
