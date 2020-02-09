@@ -46,9 +46,9 @@ program.version(packageJson.version)
   })
   .parse(process.argv);
 
-function start(branch, repositoryUri) {
-  // Preparing state
-  console.log(chalk.green(`Starting gsync@${packageJson.version} for '${branch}' branch...`));
+function prepare(dir, branch) {
+  process.chdir(dir);
+
   function check(cmd) {
     try { 
       return cp.execSync(`${cmd}`,{stdio:['pipe','pipe','ignore']}).toString().replace(/(^\s*|\s*$)/g,'')
@@ -65,14 +65,10 @@ function start(branch, repositoryUri) {
     remoteNameWhichBranchTracks : check(`git config --get branch.${branch}.remote`),
     branchExists : check(`git rev-parse --verify ${branch}`,{stdio:['pipe','pipe','ignore']})
   }
-
-  // Checking state
   if(state.containsUncommitedChanges) {
     console.log(chalk.red(`The directory contains uncommited changes. Commit them and try again.`));
     process.exit(1);
   }
-
-  // Configure remote
   console.log(chalk.yellow(`Configuring...`));
   if(repositoryUri) {
     if(state.repositoryUri) {
@@ -123,14 +119,6 @@ function start(branch, repositoryUri) {
     process.exit(1)
   }
 
-  /*
-  try {
-    cp.execSync(`git branch -u ${branchOrigin}/master ${branch}`);
-    console.log(chalk.yellow(`Branch '${branch}' origin set to '${branchOrigin}/master'.`))
-  } catch(e) {
-    console.error(e);
-  }*/
-
   try {
     cp.execSync(`git checkout ${branch}`, {stdio:'ignore'}); 
     console.log(chalk.yellow(`Branch '${branch}' checked out.`))
@@ -139,16 +127,42 @@ function start(branch, repositoryUri) {
     rollback();
     process.exit(1);
   }
+}
 
+function start(branch, repositoryUri) {
+  // Preparing state
+  console.log(chalk.green(`Starting gsync@${packageJson.version} for '${branch}' branch...`));
+  let repositories = [process.cwd()];
+  let modules = [];
+  try {
+    modules = cp.execSync('git config --file .gitmodules --get-regexp path')
+      .toString()
+      .split('\n')
+      .map(x=>x.replace(/(^\s*|\s*$)/g,''))
+      .filter(x=>!!x)
+      .map(x=>x.replace(/^submodule\..+?\.path (.+)$/,'$1'))
+    //submodule.az.path az
+    //submodule.az2.path az2
+  } catch(e) {}
+  if(modules.length) {
+    console.log(chalk.yellow(`Found submodules: ${modules.join(', ')}.`));
+    console.log(chalk.red(`Warning: gsync will checkout ${branch} at submodules. You will have to checkout 'master' manually`));
+    repositories.push(...(modules.map(x=>path.join(process.cwd(), x))));
+  }
+  
+  for(let dir of repositories) {
+    prepare(dir, branch);
+  }
   console.log(chalk.yellow(`Installing watcher on '${state.dir}'...`));
 
   // Commit request
   let committing = false;
   let commitRequest;
-  function commit() {
+  function commit(dir) {
     if(!committing) {
       committing = true;
       const comment = `gsync:auto:commit:${branch}`
+      process.chdir(dir);
       cp.execSync('git add -A');
       cp.execSync(`git commit --amend -q -m "${comment}"`);
       console.log(`committed ${chalk.yellow(`${comment}`)}`);
@@ -171,7 +185,11 @@ function start(branch, repositoryUri) {
     ignoreInitial: true
   })
   .on('all', (event, path) => {
-    commit();
+    for(let dir of repositories) {
+      if(path.startsWith(dir)) {
+        commit(dir);
+      }
+    }    
   })
   .on('ready', () => console.log(chalk.green('Watching... ')))
 }
