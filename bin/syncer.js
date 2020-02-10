@@ -228,8 +228,11 @@ function doPull(repository, config) {
     cp.execSync(`git checkout ${repository.master}`,{stdio:'ignore'});
     console.log(chalk.green(`Switched to '${repository.master}'@${repository.id}`))
     if(pull !== true) {
-      cp.execSync(`git commit -m "${pull}"`,{stdio:'ignore'});
-      console.log(chalk.green(`Commited with message ${chalk.bold(pull)}`)); 
+      let hasChanges = check('git status --porcelain');
+      if(hasChanges) {
+        cp.execSync(`git commit -m "${pull}"`,{stdio:'ignore'});
+        console.log(chalk.green(`Commited with message ${chalk.bold(pull)}`)); 
+      }
     } else{
       console.log(chalk.yellow(`Do not forget to ${chalk.bold('git commit')} the changes.`)) 
     }
