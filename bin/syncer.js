@@ -18,8 +18,9 @@ program.version(packageJson.version)
   .arguments('<branch> [repository-uri]')
   .usage(`creates a ${chalk.yellow('<branch>')} which will be syncronized with repository at ${chalk.yellow('<repository-uri>')} (you can specify the uri only once)`)
   .option('-u, --update', 'updates your remote gsync repository')
+  .option('-m, --master <branch>', `counts as your local working branch to which gsync branch is relative. Default: ${chalk.bold('master')}`)
   .action((branch, repositoryUri, options) => {
-    start(branch, repositoryUri, options.update);
+    start(branch, repositoryUri, options.update, options.master);
   })
   .allowUnknownOption()
   .on('--help',()=>{
@@ -59,24 +60,26 @@ function check(cmd) {
   }
 }
 
-function prepare(dir, branch, branchOrigin, update, repositoryUri, subdir) {
+function prepare(dir, branch, branchOrigin, update, master, repositoryUri, subdir) {
   dir = subdir ? path.join(dir, subdir): dir;
   repositoryUri = repositoryUri ? (subdir ? path.join(repositoryUri, subdir) : repositoryUri) : "";
 
   process.chdir(dir);
   
   let state = {
-    branch : check('git rev-parse --abbrev-ref HEAD'),
     containsUncommitedChanges : check('git status --porcelain'), //git diff --name-only HEAD
     repositoryUri : check(`git config --get remote.${branchOrigin}.url`),
     remoteNameWhichBranchTracks : check(`git config --get branch.${branch}.remote`),
     branchExists : check(`git rev-parse --verify ${branch}`,{stdio:['pipe','pipe','ignore']})
   }
+
   if(state.containsUncommitedChanges) {
     console.log(chalk.red(`The directory contains uncommited changes. Commit them and try again.`));
     process.exit(1);
   }
+
   console.log(chalk.green(`Configuring '${dir.replace(/^.*?([^/\\]+)$/,'$1')}'...`));
+  
   if(repositoryUri) {
     if(state.repositoryUri) {
       console.log(chalk.yellow(`Change remote uri of '${branchOrigin}' to '${repositoryUri}'`));
@@ -95,7 +98,7 @@ function prepare(dir, branch, branchOrigin, update, repositoryUri, subdir) {
   }
 
   try {
-    cp.execSync(`git checkout master`,{stdio:'ignore'});
+    cp.execSync(`git checkout ${master}`,{stdio:'ignore'});
   } catch(e) {}
 
   if(state.branchExists) {
@@ -115,7 +118,7 @@ function prepare(dir, branch, branchOrigin, update, repositoryUri, subdir) {
     try {
       cp.execSync(`git push -u ${branchOrigin} ${branch}:master --force`,{stdio:'ignore'});
       cp.execSync(`git checkout ${branch}`, {stdio:'ignore'});
-      console.log(chalk.yellow(`Branch '${branchOrigin}/master' updated to recent 'master'.`));
+      console.log(chalk.yellow(`Branch '${branchOrigin}/master' updated to recent '${master}'.`));
     } catch(e) {
       console.log(chalk.red(`Error: can not checkout '${branch}'' branch to push changes`));
       process.exit(1);
@@ -141,11 +144,12 @@ function prepare(dir, branch, branchOrigin, update, repositoryUri, subdir) {
   }
 }
 
-function start(branch, repositoryUri, update) {
+function start(branch, repositoryUri, update, master) {
   // Preparing state
   console.log(chalk.green(`Starting gsync@${packageJson.version} for '${branch}' branch...`));
   let state = {
-    dir : check('git rev-parse --show-toplevel')
+    dir : check('git rev-parse --show-toplevel'),
+    branch : check('git rev-parse --abbrev-ref HEAD')
   }
   let branchOrigin = `${branch}_origin`;
   let repositories = [state.dir];
@@ -166,9 +170,9 @@ function start(branch, repositoryUri, update) {
   }
 
   // Preparing repositories
-  prepare(state.dir, branch, branchOrigin, update, repositoryUri);
+  prepare(state.dir, branch, branchOrigin, update, master, repositoryUri);
   for(let module of modules) {
-    prepare(state.dir, branch, branchOrigin, update, repositoryUri, module);
+    prepare(state.dir, branch, branchOrigin, update, master, repositoryUri, module);
   }
 
   console.log(chalk.yellow(`Installing watcher on '${state.dir}'...`));
@@ -179,7 +183,8 @@ function start(branch, repositoryUri, update) {
   function commit(dir) {
     if(!committing) {
       committing = true;
-      const comment = `gsync:auto:commit:${branch}`
+      const id = ${dir.replace(/^.*?([^/\\]+)$/,'$1')};
+      const comment = `gsync:auto:commit:${branch}:${id}`
       process.chdir(dir);
       cp.execSync('git add -A');
       cp.execSync(`git commit --amend -q -m "${comment}"`);
@@ -225,12 +230,20 @@ function start(branch, repositoryUri, update) {
   function quit() {
     watcher.close()
     .then(()=>{
-      process.chdir(state.dir)
-      cp.execSync('git checkout master');
-      for(let module of modules) {
-        process.chdir(path.join(state.dir, module));
-        cp.execSync('git checkout master');
-      }
+      [state.dir, ...(modules.map(x=>path.join(state.dir, x)))].forEach((dir)=>{
+        process.chdir(dir);
+        let revision = check(`git rev-parse HEAD`);
+        cp.execSync(`git checkout ${master}`,{stdio:'ignore'});
+        console.log(chalk.green(`Switched to '${master}'`))
+        if(update) {
+          try {
+            cp.execSync(`git cherry-pick ${revision}`,{stdio:'ignore'});
+            console.log(chalk.green(`Cherry-picked commit to '${master}'. Do not forget to --amend it.`))
+          } catch(e) {
+            console.log(chalk.red(`Failed to cherry-pick commit to '${master}'`))
+          }          
+        }
+      })
       process.exit();
     })
   }
