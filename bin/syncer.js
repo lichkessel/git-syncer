@@ -14,23 +14,34 @@ let command;
 
 const program = require('commander');
 
-program.version(packageJson.version)
-  .arguments('<branch> [repository-uri]')
-  .usage(`creates a ${chalk.yellow('<branch>')} which will be syncronized with repository at ${chalk.yellow('<repository-uri>')} (you can specify the uri only once)`)
+program
+  .command('gsync')
+  .version(packageJson.version)
+  .arguments(`[branch] [repository-uri]`)
+  .usage(`[branch] [repository-uri]
+    Creates a ${chalk.yellow('<branch>')} which will be syncronized with repository at ${chalk.yellow('<repository-uri>')} 
+    ${chalk.green(chalk.bold('Without params gsync uses parameters (not options) from previous launch'))}`)
   .option('-u, --update', 'updates your remote gsync repository to master branch state')
   .option('-s, --single', 'same as --update but also puts gsync commit to master branch after quit')
   .option('-m, --master <branch>', `counts as your local working branch to which gsync branch is relative. Default: ${chalk.bold('master')}`)
   .action((branch, repositoryUri, options) => {
-    start(branch, repositoryUri, options.update || options.single, options.master || 'master', options.single);
+    let config = configuration( 
+      branch, 
+      repositoryUri, 
+      options.update, 
+      options.master,
+      options.single
+    );
+    start(config);
   })
   .allowUnknownOption()
   .on('--help',()=>{
     console.log(``);
-    console.log(`${chalk.red('WARNING')}: ${chalk.bold('do not commit to gsync branch.')}`);
+    console.log(`${chalk.red('WARNING')}: ${chalk.bold('do not manually commit to gsync branch.')}`);
     console.log(`All commits which are not pushed to remote will be deleted`);
-    console.log(`${chalk.blue('INFO')}: normally, your gsync branch should contain only one commit`);
+    console.log(`${chalk.blue('INFO')}: normally, your gsync branch should contain only one generated commit`);
     console.log(``);
-    console.log(chalk.blue(`- Configure server: `))
+    console.log(chalk.blue(`- Configure server manually: `))
     console.log(`  In the remote repository: `);
     console.log(chalk.bold(`  git config --local receive.denyCurrentBranch updateInstead`));
     console.log(`  Consider this repository as ${chalk.red('read-only')}.`);
@@ -61,7 +72,45 @@ function check(cmd) {
   }
 }
 
-function prepare(dir, branch, branchOrigin, update, master, repositoryUri, subdir) {
+function configuration(branch, repositoryUri, update, master, single) {
+  //git config --local gsync.branch alexander
+  let config = {
+    update : update || single,
+    single,
+    master : master || 'master'
+  }
+  let serializable = {
+    branch,
+    repositoryUri
+  }
+  let localConfig = {}
+  for(let name in serializable) {
+    localConfig[name] = check(`git config --get gsync.${name}`);
+  }
+  for(let name in localConfig) {
+    localConfig[name] = localConfig[name] ==='true' ? true : 
+      (localConfig[name] === 'false' ? false : 
+        (localConfig[name] ? localConfig[name] : undefined ))
+  }
+  for(let name in serializable) {
+    if(serializable[name] === undefined) {
+      serializable[name] = localConfig[name];
+    }
+  }
+  for(let name in serializable) {
+    if(serializable[name] !== undefined) {
+      cp.execSync(`git config --local gsync.${name} ${serializable[name].toString()}`,{stdio:'ignore'});
+    }
+  }
+  for(let name in serializable) {
+    config[name] = serializable[name];
+  }
+  return config;
+}
+
+function prepare(dir, config, subdir) {
+  let {branch, repositoryUri, update, master, single} = config;
+
   dir = subdir ? path.join(dir, subdir): dir;
   repositoryUri = repositoryUri ? (subdir ? path.join(repositoryUri, subdir) : repositoryUri) : "";
 
@@ -152,9 +201,12 @@ function prepare(dir, branch, branchOrigin, update, master, repositoryUri, subdi
   return state;
 }
 
-function start(branch, repositoryUri, update, master, single) {
+function start(config) {
+  let {branch, repositoryUri, update, master, single} = config;
   // Preparing state
   console.log(chalk.green(`Starting gsync@${packageJson.version} for '${branch}' branch...`));
+  printConfig(config);
+  return;
   let glob = {
     dir : check('git rev-parse --show-toplevel'),
     branch : check('git rev-parse --abbrev-ref HEAD')
@@ -179,9 +231,9 @@ function start(branch, repositoryUri, update, master, single) {
 
   // Preparing repositories
   let states = []
-  states.push(prepare(glob.dir, branch, branchOrigin, update, master, repositoryUri));
+  states.push(prepare(glob.dir, config));
   for(let module of modules) {
-    states.push(prepare(glob.dir, branch, branchOrigin, update, master, repositoryUri, module));
+    states.push(prepare(glob.dir, config, module));
   }
 
   console.log(chalk.yellow(`Installing watcher on '${glob.dir}'...`));
@@ -278,4 +330,15 @@ function start(branch, repositoryUri, update, master, single) {
       quit()
     }
   });
+}
+
+function printConfig(config) {
+  let str = [];
+  console.log(chalk.green('Launch configuration:'))
+  for(let name in config) {
+    if(config[name] !== undefined) {
+      str.push(`${name}: ${config[name]}`)
+    }
+  }
+  console.log(chalk.yellow(str.join(' | ')))
 }
