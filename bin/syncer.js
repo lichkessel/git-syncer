@@ -20,17 +20,22 @@ program
     Creates a ${chalk.yellow('<branch>')} which will be syncronized with repository at ${chalk.yellow('<repository-uri>')} 
     ${chalk.green(chalk.bold('Without params gsync uses parameters (not options) from previous launch'))}`)
   .option('-u, --update', 'updates your remote gsync repository to master branch state')
-  .option('-s, --single', 'same as --update but also puts gsync commit to master branch after quit')
+  .option('-p, --pull', 'pulls changes from gsync branch to master branch')
   .option('-m, --master <branch>', `counts as your local working branch to which gsync branch is relative. Default: ${chalk.bold('master')}`)
+  .option('--test', 'test')
   .action((branch, repositoryUri, options) => {
     let config = configuration( 
       branch, 
       repositoryUri, 
       options.update, 
       options.master,
-      options.single
+      otions.pull
     );
-    start(config);
+    if(options.test) {
+      test(config);
+    } else {
+      start(config);
+    }   
   })
   .allowUnknownOption()
   .on('--help',()=>{
@@ -70,15 +75,17 @@ function check(cmd) {
   }
 }
 
-function configuration(branch, repositoryUri, update, master, single) {
+function configuration(branch, repositoryUri, update, master, pull) {
   //git config --local gsync.branch alexander
   let config = {
-    update : update || single,
-    single,
-    master : master || 'master'
+    update,
+    pull,
+    master : master || 'master',
+    dir : check('git rev-parse --show-toplevel')
   }
   let serializable = {
     branch,
+    branchOrigin: `${branch}_origin`,
     repositoryUri
   }
   let localConfig = {}
@@ -106,41 +113,40 @@ function configuration(branch, repositoryUri, update, master, single) {
   return config;
 }
 
-function prepare(dir, config, branchOrigin, subdir) {
-  let {branch, repositoryUri, update, master, single} = config;
-
-  dir = subdir ? path.join(dir, subdir): dir;
-  repositoryUri = repositoryUri ? (subdir ? path.join(repositoryUri, subdir) : repositoryUri) : "";
+function prepare( repository, config ) {
+  let { branch, branchOrigin, repositoryUri, update, master, single } = config;
+  let { dir, module } = repository;
 
   process.chdir(dir);
   
-  let state = {
-    id : dir.replace(/^.*?([^/\\]+)$/,'$1'),
-    dir : dir,
-    root: subdir ? `${subdir}${path.sep}` : '',
-    master: master,
+  let state = repository.state = {
     revision: check('git rev-parse HEAD'),
     containsUncommitedChanges : check('git status --porcelain'), //git diff --name-only HEAD
     repositoryUri : check(`git config --get remote.${branchOrigin}.url`),
     remoteNameWhichBranchTracks : check(`git config --get branch.${branch}.remote`),
     branchExists : check(`git rev-parse --verify ${branch}`,{stdio:['pipe','pipe','ignore']})
   }
-  state.comment = `gsync:auto:commit:${branch}:${state.id}`;
+  repository.id = dir.replace(/^.*?([^/\\]+)$/,'$1');
+  repository.master = master;
+  repository.root = module ? `${module}${path.sep}` : '';
+  repository.uri = repositoryUri = repositoryUri ? (module ? path.join(repositoryUri, module) : repositoryUri) : "";
+
+  state.comment = `gsync:auto:commit:${branch}:${repository.id}`;
 
   if(state.containsUncommitedChanges) {
     console.log(chalk.red(`The directory contains uncommited changes. Commit them and try again.`));
     process.exit(1);
   }
 
-  console.log(chalk.green(`Configuring '${state.id}'...`));
+  console.log(chalk.green(`Configuring '${repository.id}'...`));
   
-  if(repositoryUri) {
+  if(repository.uri) {
     if(state.repositoryUri) {
-      console.log(chalk.yellow(`Change remote uri of '${branchOrigin}' to '${repositoryUri}'`));
-      cp.execSync(`git remote set-url ${branchOrigin} ${repositoryUri}`);
+      console.log(chalk.yellow(`Change remote uri of '${branchOrigin}' to '${repository.uri}'`));
+      cp.execSync(`git remote set-url ${branchOrigin} ${repository.uri}`);
     } else {
-      console.log(chalk.yellow(`Set remote '${branchOrigin}' uri to '${repositoryUri}'`));
-      cp.execSync(`git remote add ${branchOrigin} ${repositoryUri}`);
+      console.log(chalk.yellow(`Set remote '${branchOrigin}' uri to '${repository.uri}'`));
+      cp.execSync(`git remote add ${branchOrigin} ${repository.uri}`);
     }
   } else {
     if(state.repositoryUri) {
@@ -178,7 +184,7 @@ function prepare(dir, config, branchOrigin, subdir) {
       process.exit(1);
     }    
   } else {
-    console.log(chalk.yellow(`Fetching changes from '${branchOrigin}' at '${state.repositoryUri || repositoryUri}'...`));
+    console.log(chalk.yellow(`Fetching changes from '${branchOrigin}' at '${state.repositoryUri || repository.uri}'...`));
     cp.execSync(`git fetch ${branchOrigin}`,{stdio:'ignore'});
     try {
       cp.execSync(`git branch ${branch} -t ${branchOrigin}/master`,{stdio:'ignore'});
@@ -196,20 +202,20 @@ function prepare(dir, config, branchOrigin, subdir) {
       process.exit(1);
     }
   }
-  return state;
 }
 
 function start(config) {
-  let {branch, repositoryUri, update, master, single} = config;
+  let {branch, branchOrigin, repositoryUri, update, master, pull} = config;
   // Preparing state
   console.log(chalk.green(`Starting gsync@${packageJson.version} for '${branch}' branch...`));
   printConfig(config);
   let glob = {
-    dir : check('git rev-parse --show-toplevel'),
     branch : check('git rev-parse --abbrev-ref HEAD')
   }
-  let branchOrigin = `${branch}_origin`;
-  let repositories = [glob.dir];
+  let repositories = [{
+    dir: config.dir,
+    module: ''
+  }];
   let modules = [];
   try {
     modules = cp.execSync('git config --file .gitmodules --get-regexp path')
@@ -223,30 +229,43 @@ function start(config) {
   } catch(e) {}
   if(modules.length) {
     console.log(chalk.yellow(`Found submodules: ${modules.join(', ')}.`));
-    repositories.push(...(modules.map(x=>path.join(glob.dir, x))));
+    repositories.push(...(modules.map((module)=>{
+      return {
+        dir: path.join(config.dir, module),
+        module: module
+      }
+    })));
   }
 
   // Preparing repositories
-  let states = []
-  states.push(prepare(glob.dir, config, branchOrigin));
-  for(let module of modules) {
-    states.push(prepare(glob.dir, config, branchOrigin, module));
+  for(let repository of repositories) {
+    prepare(repository, config);
+  }
+  //let states = []
+  //states.push(prepare(config.dir, config));
+  //for(let module of modules) {
+  //  states.push(prepare(config.dir, config, module));
+  //}
+
+  if(config.pull) {
+    pull(repositories, config);
+    return;
   }
 
-  console.log(chalk.yellow(`Installing watcher on '${glob.dir}'...`));
+  console.log(chalk.yellow(`Installing watcher on '${config.dir}'...`));
 
   // Commit request
   let committing = false;
   let commitRequest;
-  function commit(state) {
+  function commit(repository) {
     if(!committing) {
       committing = true;
-      process.chdir(state.dir);
+      process.chdir(repository.dir);
       let revision = check(`git rev-parse HEAD`);
-      let replace = state.revision !== revision;
+      let replace = repository.state.revision !== revision;
       cp.execSync('git add -A');
-      cp.execSync(`git commit ${replace ? '--amend' : ''} -q -m "${state.comment}"`);
-      console.log(`committed ${chalk.yellow(`${state.comment}`)}`);
+      cp.execSync(`git commit ${replace ? '--amend' : ''} -q -m "${repository.comment}"`);
+      console.log(`committed ${chalk.yellow(`${repository.comment}`)}`);
       try {
         cp.execSync(`git push ${branchOrigin} ${branch}:master --force -q`,{stdio:'ignore'});
         console.log(`pushed to ${chalk.yellow(`${branchOrigin}`)}`);
@@ -269,22 +288,22 @@ function start(config) {
   // Watcher
   let commitJob;
   let watcher = chokidar.watch('.', {
-    cwd: glob.dir,
+    cwd: config.dir,
     ignored: ['node_modules', '.git'],
     ignoreInitial: true
   })
   .on('all', (event, p) => {
     let maxCount = -1;
     let bestState = null;
-    for(let state of states) {
-      if(p.startsWith(state.root)) {
-        if(state.root.length > maxCount) {
-          maxCount = state.root.length;
-          bestState = state;
+    for(let repository of repositories) {
+      if(p.startsWith(repository.root)) {
+        if(repository.root.length > maxCount) {
+          maxCount = repository.root.length;
+          bestState = repository;
         }
       }
     }
-    commit(bestState); 
+    commit(repository); 
   })
   .on('ready', () => console.log(chalk.green('Watching... Press Q to exit.')))
 
@@ -292,29 +311,10 @@ function start(config) {
   function quit() {
     watcher.close()
     .then(()=>{
-      for(let state of states) {
-        process.chdir(state.dir);
-        let revision = check(`git rev-parse HEAD`);
-        cp.execSync(`git checkout ${state.master}`,{stdio:'ignore'});
-        console.log(chalk.green(`Switched to '${state.master}' at '${state.dir}'`))
-        if(single && revision !== state.revision) {
-          try {
-            cp.execSync(`git rebase ${branch}`,{stdio:'ignore'});
-            while(true) {
-              let next = check(`git log --format=%B -n 1 head~1`);
-              if(next === state.comment) {
-                cp.execSync(`git reset --soft head^`,{stdio:'ignore'});
-              } else {
-                cp.execSync(`git commit --amend --no-edit`,{stdio:'ignore'});
-                break;
-              }
-            }
-            console.log(chalk.green(`Rebased '${state.master}' to '${branch}' at '${state.dir}'.`));
-            console.log(chalk.green(`Do not forget to ${chalk.bold('--amend')} commit message.`))
-          } catch(e) {
-            console.log(chalk.red(`Failed to save commit to '${state.master}' at '${state.dir}'`))
-          }          
-        }
+      for(let repository of repositories) {
+        process.chdir(repository.dir);
+        cp.execSync(`git checkout ${repository.master}`,{stdio:'ignore'});
+        console.log(chalk.green(`Switched to '${repository.master}' at '${repository.dir}'`))
       }
       process.exit();
     })
@@ -329,6 +329,23 @@ function start(config) {
   });
 }
 
+function pull(repositories, config) {
+  let { branch } = config;
+  for(let repository of repositories) {
+    process.chdir(repository.dir);
+    let revision = check(`git rev-parse ${repository.master}`);
+    try {
+      cp.execSync(`git reset --soft ${revision}`,{stdio:'ignore'});
+      console.log(chalk.green(`Changes staged to '${repository.master}' from '${branch}' at '${repository.dir}'.`));
+      console.log(chalk.green(`Do not forget to ${chalk.bold('git commit')} the changes.`))
+      cp.execSync(`git checkout ${repository.master}`,{stdio:'ignore'});
+      console.log(chalk.green(`Switched to '${repository.master}' at '${repository.dir}'`))
+    } catch(e) {
+      console.log(chalk.red(`Failed to save commit to '${repository.master}' at '${repository.dir}'`))
+    }
+  }
+}
+
 function printConfig(config) {
   let str = [];
   console.log(chalk.green('Launch configuration:'))
@@ -338,4 +355,34 @@ function printConfig(config) {
     }
   }
   console.log(chalk.yellow(str.join(' | ')))
+}
+
+function lockGit() {
+
+}
+
+function unlockGit() {
+
+}
+
+function lockApp() {
+
+}
+
+function unlockApp() {
+
+}
+
+function test() {
+  let glob = {
+    dir : check('git rev-parse --show-toplevel')
+  }
+  let watcher = chokidar.watch('.git', {
+    cwd: glob.dir,
+    ignoreInitial: true
+  })
+  .on('add', (p) => {//
+    console.log(p); 
+  })
+  .on('ready', () => console.log(chalk.green('.git files watching...')))
 }
