@@ -85,7 +85,6 @@ function configuration(branch, repositoryUri, update, master, pull) {
   }
   let serializable = {
     branch,
-    branchOrigin: `${branch}_origin`,
     repositoryUri
   }
   let localConfig = {}
@@ -110,6 +109,8 @@ function configuration(branch, repositoryUri, update, master, pull) {
   for(let name in serializable) {
     config[name] = serializable[name];
   }
+  
+  config.branchOrigin = `${branch}_origin`;
   return config;
 }
 
