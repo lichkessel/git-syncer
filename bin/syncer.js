@@ -183,7 +183,7 @@ function start(branch, repositoryUri, update, master) {
   function commit(dir) {
     if(!committing) {
       committing = true;
-      const id = ${dir.replace(/^.*?([^/\\]+)$/,'$1')};
+      const id = dir.replace(/^.*?([^/\\]+)$/,'$1');
       const comment = `gsync:auto:commit:${branch}:${id}`
       process.chdir(dir);
       cp.execSync('git add -A');
