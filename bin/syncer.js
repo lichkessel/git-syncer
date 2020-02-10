@@ -190,7 +190,7 @@ function start(branch, repositoryUri, update, master) {
   function commit(state) {
     if(!committing) {
       committing = true;
-      
+
       const comment = `gsync:auto:commit:${branch}:${state.id}`
       process.chdir(state.dir);
 
@@ -236,15 +236,7 @@ function start(branch, repositoryUri, update, master) {
         }
       }
     }
-    commit(bestState);
-
-    for(let module of modules) {
-      if(p.startsWith(`${module}${path.sep}`)) {
-        commit(path.join(glob.dir,module));
-        return;
-      }
-    } 
-    commit(glob.dir);  
+    commit(bestState); 
   })
   .on('ready', () => console.log(chalk.green('Watching... Press Q to exit.')))
 
