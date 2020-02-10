@@ -115,7 +115,7 @@ function configuration(branch, repositoryUri, options) {
   return config;
 }
 
-function doPrepare( repository, config ) {
+function doConfigure( repository, config ) {
   let { branch, branchOrigin, repositoryUri, master } = config;
   let { dir, module } = repository;
 
@@ -159,12 +159,14 @@ function doPrepare( repository, config ) {
   }
 }
 
-function doReady( repository, config ) {
+function doPrepare( repository, config ) {
   let { branch, branchOrigin, update, master } = config;
   let { dir, module } = repository;
   let state = repository.state;
 
   process.chdir(dir);
+
+  console.log(chalk.green(`Preparing '${repository.id}'...`));
 
   try {
     cp.execSync(`git checkout ${master}`,{stdio:'ignore'});
@@ -221,10 +223,14 @@ function doPull(repository, config) {
     console.log(chalk.green(`Switched to '${repository.master}'@${repository.id}`))
   } catch(e) {}
   try {
-    cp.execSync(`git merge --squash ${branch}`);
-    console.log(chalk.green(`Changes merged successfully! Do not forget to ${chalk.bold('git commit')} them.`));
+    cp.execSync(`git merge --squash ${branch}`,{stdio:'ignore'});
+    console.log(chalk.green(`Changes added successfully!`));
+    console.log(chalk.green(`${chalk.bold('ToDo')}: ${chalk.bold('git commit')}`))
   } catch(e) {
-    console.log(chalk.red(`Resolve merge conflicts of '${repository.master}'@${repository.id} and ${chalk.bold('git commit')} changes.`));
+    console.log(chalk.red(`Merge conflicts`));
+    console.log(chalk.red(`${chalk.bold('ToDo')}: resolve merge conflicts`))
+    console.log(chalk.red(`${chalk.bold('ToDo')}: ${chalk.bold('git add -A')}`))
+    console.log(chalk.red(`${chalk.bold('ToDo')}: ${chalk.bold('git commit')}`))
   }
 }
 
@@ -232,7 +238,7 @@ function start(config) {
   let {branch, branchOrigin, repositoryUri, update, master, pull} = config;
   // Preparing state
   console.log(chalk.green(`Starting gsync@${packageJson.version} for '${branch}' branch...`));
-  printConfig(config);
+  //printConfig(config);
   let glob = {
     branch : check('git rev-parse --abbrev-ref HEAD')
   }
@@ -261,9 +267,9 @@ function start(config) {
     })));
   }
 
-  // Preparing repositories
+  // Configure repositories
   for(let repository of repositories) {
-    doPrepare(repository, config);
+    doConfigure(repository, config);
   }
 
   if(config.pull) {
@@ -273,9 +279,9 @@ function start(config) {
     return;
   }
 
-  // Ready repositories
+  // Prepare repositories
   for(let repository of repositories) {
-    doReady(repository, config);
+    doPrepare(repository, config);
   }
 
   console.log(chalk.yellow(`Installing watcher on '${config.dir}'...`));
