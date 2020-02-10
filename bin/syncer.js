@@ -27,7 +27,12 @@ program
     let config = configuration( 
       branch, 
       repositoryUri, 
-      options
+      {
+        update: options.update,
+        pull: options.pull,
+        master: options.master,
+        test: options.test
+      }
     );
     if(options.test) {
       test(config);
