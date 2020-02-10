@@ -214,7 +214,7 @@ function doReady( repository, config ) {
 }
 
 function doPull(repository, config) {
-  let { branch, pull } = config;
+  let { branch, branchOrigin, pull } = config;
   process.chdir(repository.dir);
   let revision = check(`git rev-parse ${repository.master}`);
   try {
