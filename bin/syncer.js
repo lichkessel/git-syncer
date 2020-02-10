@@ -206,7 +206,6 @@ function start(config) {
   // Preparing state
   console.log(chalk.green(`Starting gsync@${packageJson.version} for '${branch}' branch...`));
   printConfig(config);
-  return;
   let glob = {
     dir : check('git rev-parse --show-toplevel'),
     branch : check('git rev-parse --abbrev-ref HEAD')
