@@ -115,7 +115,7 @@ function configuration(branch, repositoryUri, update, master, pull) {
 }
 
 function prepare( repository, config ) {
-  let { branch, branchOrigin, repositoryUri, update, master, single } = config;
+  let { branch, branchOrigin, repositoryUri, master } = config;
   let { dir, module } = repository;
 
   process.chdir(dir);
@@ -156,6 +156,14 @@ function prepare( repository, config ) {
       process.exit(1);
     }
   }
+}
+
+function ready( repository, config ) {
+  let { branch, branchOrigin, update, master } = config;
+  let { dir, module } = repository;
+  let state = repository.state;
+
+  process.chdir(dir);
 
   try {
     cp.execSync(`git checkout ${master}`,{stdio:'ignore'});
@@ -204,6 +212,24 @@ function prepare( repository, config ) {
   }
 }
 
+function pull(repository, config) {
+  let { branch } = config;
+  process.chdir(repository.dir);
+  let revision = check(`git rev-parse ${repository.master}`);
+  try {
+    cp.execSync(`git checkout ${branch}`,{stdio:'ignore'});
+  } catch(e) {}
+  try {
+    cp.execSync(`git reset --soft ${revision}`,{stdio:'ignore'});
+    console.log(chalk.green(`Changes staged to '${repository.master}' from '${branch}' at '${repository.dir}'.`));
+    console.log(chalk.green(`Do not forget to ${chalk.bold('git commit')} the changes.`))
+    cp.execSync(`git checkout ${repository.master}`,{stdio:'ignore'});
+    console.log(chalk.green(`Switched to '${repository.master}' at '${repository.dir}'`))
+  } catch(e) {
+    console.log(chalk.red(`Failed to save commit to '${repository.master}' at '${repository.dir}'`))
+  }
+}
+
 function start(config) {
   let {branch, branchOrigin, repositoryUri, update, master, pull} = config;
   // Preparing state
@@ -241,15 +267,17 @@ function start(config) {
   for(let repository of repositories) {
     prepare(repository, config);
   }
-  //let states = []
-  //states.push(prepare(config.dir, config));
-  //for(let module of modules) {
-  //  states.push(prepare(config.dir, config, module));
-  //}
 
   if(config.pull) {
-    pull(repositories, config);
+    for(let repository of repositories) {
+      pull(repository, config);
+    }
     return;
+  }
+
+  // Ready repositories
+  for(let repository of repositories) {
+    ready(repository, config);
   }
 
   console.log(chalk.yellow(`Installing watcher on '${config.dir}'...`));
@@ -327,23 +355,6 @@ function start(config) {
       quit()
     }
   });
-}
-
-function pull(repositories, config) {
-  let { branch } = config;
-  for(let repository of repositories) {
-    process.chdir(repository.dir);
-    let revision = check(`git rev-parse ${repository.master}`);
-    try {
-      cp.execSync(`git reset --soft ${revision}`,{stdio:'ignore'});
-      console.log(chalk.green(`Changes staged to '${repository.master}' from '${branch}' at '${repository.dir}'.`));
-      console.log(chalk.green(`Do not forget to ${chalk.bold('git commit')} the changes.`))
-      cp.execSync(`git checkout ${repository.master}`,{stdio:'ignore'});
-      console.log(chalk.green(`Switched to '${repository.master}' at '${repository.dir}'`))
-    } catch(e) {
-      console.log(chalk.red(`Failed to save commit to '${repository.master}' at '${repository.dir}'`))
-    }
-  }
 }
 
 function printConfig(config) {
