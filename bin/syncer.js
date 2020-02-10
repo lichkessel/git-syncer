@@ -149,7 +149,8 @@ function start(branch, repositoryUri, update, master) {
   console.log(chalk.green(`Starting gsync@${packageJson.version} for '${branch}' branch...`));
   let state = {
     dir : check('git rev-parse --show-toplevel'),
-    branch : check('git rev-parse --abbrev-ref HEAD')
+    branch : check('git rev-parse --abbrev-ref HEAD'),
+    revision: check('git rev-parse HEAD')
   }
   let branchOrigin = `${branch}_origin`;
   let repositories = [state.dir];
@@ -234,13 +235,13 @@ function start(branch, repositoryUri, update, master) {
         process.chdir(dir);
         let revision = check(`git rev-parse HEAD`);
         cp.execSync(`git checkout ${master}`,{stdio:'ignore'});
-        console.log(chalk.green(`Switched to '${master}'`))
-        if(update) {
+        console.log(chalk.green(`Switched to '${master}' at '${dir}'`))
+        if(update && revision !== state.revision) {
           try {
             cp.execSync(`git cherry-pick ${revision}`,{stdio:'ignore'});
-            console.log(chalk.green(`Cherry-picked commit to '${master}'. Do not forget to --amend it.`))
+            console.log(chalk.green(`Cherry-picked commit to '${master}' at '${dir}'. Do not forget to --amend it.`))
           } catch(e) {
-            console.log(chalk.red(`Failed to cherry-pick commit to '${master}'`))
+            console.log(chalk.red(`Failed to cherry-pick commit to '${master}' at '${dir}'`))
           }          
         }
       })
