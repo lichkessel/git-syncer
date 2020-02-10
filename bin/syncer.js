@@ -20,16 +20,14 @@ program
     Creates a ${chalk.yellow('<branch>')} which will be syncronized with repository at ${chalk.yellow('<repository-uri>')} 
     ${chalk.green(chalk.bold('Without params gsync uses parameters (not options) from previous launch'))}`)
   .option('-u, --update', 'updates your remote gsync repository to master branch state')
-  .option('-p, --pull', 'pulls changes from gsync branch to master branch')
+  .option('-p, --pull [commit-message]', 'pulls changes from gsync branch to master branch and (optionally) commits changes')
   .option('-m, --master <branch>', `counts as your local working branch to which gsync branch is relative. Default: ${chalk.bold('master')}`)
   .option('--test', 'test')
   .action((branch, repositoryUri, options) => {
     let config = configuration( 
       branch, 
       repositoryUri, 
-      options.update, 
-      options.master,
-      options.pull
+      options
     );
     if(options.test) {
       test(config);
@@ -75,14 +73,12 @@ function check(cmd) {
   }
 }
 
-function configuration(branch, repositoryUri, update, master, pull) {
+function configuration(branch, repositoryUri, options) {
   //git config --local gsync.branch alexander
-  let config = {
-    update,
-    pull,
-    master : master || 'master',
-    dir : check('git rev-parse --show-toplevel')
-  }
+  let config = { ...options  }
+  config.master = config.master || 'master';
+  config.dir = check('git rev-parse --show-toplevel');
+
   let serializable = {
     branch,
     repositoryUri
@@ -180,7 +176,7 @@ function doReady( repository, config ) {
     try {
       cp.execSync(`git branch ${branch}`,{stdio:'ignore'});
     } catch(e) {
-      console.log(chalk.red(`Error: can not create '${branch}'' branch`));
+      console.log(chalk.red(`Error: can not create '${branch}' branch`));
       process.exit(1);
     }
     try {
@@ -213,7 +209,7 @@ function doReady( repository, config ) {
 }
 
 function doPull(repository, config) {
-  let { branch } = config;
+  let { branch, pull } = config;
   process.chdir(repository.dir);
   let revision = check(`git rev-parse ${repository.master}`);
   try {
@@ -221,12 +217,21 @@ function doPull(repository, config) {
   } catch(e) {}
   try {
     cp.execSync(`git reset --soft ${revision}`,{stdio:'ignore'});
-    console.log(chalk.green(`Changes staged to '${repository.master}' from '${branch}' at '${repository.dir}'.`));
-    console.log(chalk.green(`Do not forget to ${chalk.bold('git commit')} the changes.`))
+    console.log(chalk.green(`Changes staged to '${repository.master}' from '${branch}'@${repository.id}`));
+    cp.execSync(`git push -u ${branchOrigin} ${branch}:master --force`,{stdio:'ignore'});
+    console.log(chalk.yellow(`Branch '${branchOrigin}/master' updated to recent '${master}'.`));
     cp.execSync(`git checkout ${repository.master}`,{stdio:'ignore'});
-    console.log(chalk.green(`Switched to '${repository.master}' at '${repository.dir}'`))
+    console.log(chalk.green(`Switched to '${repository.master}'@${repository.id}`))
+    if(pull !== true) {
+      cp.execSync(`git commit -m "${pull}"`,{stdio:'ignore'});
+      console.log(chalk.green(`Commited with message ${chalk.bold(pull)}`)); 
+    } else{
+      console.log(chalk.yellow(`Do not forget to ${chalk.bold('git commit')} the changes.`)) 
+    }
   } catch(e) {
-    console.log(chalk.red(`Failed to save commit to '${repository.master}' at '${repository.dir}'`))
+    console.log(chalk.red(`Failed to save commit to '${repository.master}'@${repository.id}`))
+    console.error(e);
+    process.exit(1)
   }
 }
 
@@ -342,7 +347,7 @@ function start(config) {
       for(let repository of repositories) {
         process.chdir(repository.dir);
         cp.execSync(`git checkout ${repository.master}`,{stdio:'ignore'});
-        console.log(chalk.green(`Switched to '${repository.master}' at '${repository.dir}'`))
+        console.log(chalk.green(`Switched to '${repository.master}'@${repository.id}`))
       }
       process.exit();
     })
