@@ -251,9 +251,9 @@ function start(branch, repositoryUri, update, master) {
         console.log(chalk.green(`Switched to '${state.master}' at '${state.dir}'`))
         if(update && revision !== state.revision) {
           try {
-            cp.execSync(`git cherry-pick ${revision}`,{stdio:'ignore'});
-            console.log(chalk.green(`Cherry-picked commit to '${state.master}' at '${state.dir}'.`));
-            console.log(chalk.green(`Do not forget to --amend it.`))
+            cp.execSync(`git rebase ${branch}`,{stdio:'ignore'});
+            console.log(chalk.green(`Rebased '${state.master}' to '${branch}' at '${state.dir}'.`));
+            console.log(chalk.green(`Do not forget to ${chalk.bold(--amend)} commit message.`))
           } catch(e) {
             console.log(chalk.red(`Failed to cherry-pick commit to '${state.master}' at '${state.dir}'`))
           }          
