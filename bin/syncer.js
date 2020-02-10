@@ -29,7 +29,7 @@ program
       repositoryUri, 
       options.update, 
       options.master,
-      otions.pull
+      options.pull
     );
     if(options.test) {
       test(config);
