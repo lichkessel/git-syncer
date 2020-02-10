@@ -303,7 +303,7 @@ function start(config) {
         }
       }
     }
-    commit(repository); 
+    commit(bestState); 
   })
   .on('ready', () => console.log(chalk.green('Watching... Press Q to exit.')))
 
