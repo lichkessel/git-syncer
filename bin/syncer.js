@@ -130,8 +130,7 @@ function prepare( repository, config ) {
   repository.master = master;
   repository.root = module ? `${module}${path.sep}` : '';
   repository.uri = repositoryUri = repositoryUri ? (module ? path.join(repositoryUri, module) : repositoryUri) : "";
-
-  state.comment = `gsync:auto:commit:${branch}:${repository.id}`;
+  repository.comment = `gsync:auto:commit:${branch}:${repository.id}`;
 
   if(state.containsUncommitedChanges) {
     console.log(chalk.red(`The directory contains uncommited changes. Commit them and try again.`));
