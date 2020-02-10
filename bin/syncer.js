@@ -17,10 +17,11 @@ const program = require('commander');
 program.version(packageJson.version)
   .arguments('<branch> [repository-uri]')
   .usage(`creates a ${chalk.yellow('<branch>')} which will be syncronized with repository at ${chalk.yellow('<repository-uri>')} (you can specify the uri only once)`)
-  .option('-u, --update', 'updates your remote gsync repository')
+  .option('-u, --update', 'updates your remote gsync repository to master branch state')
+  .option('-s, --single', 'same as --update but also puts gsync commit to master branch after quit')
   .option('-m, --master <branch>', `counts as your local working branch to which gsync branch is relative. Default: ${chalk.bold('master')}`)
   .action((branch, repositoryUri, options) => {
-    start(branch, repositoryUri, options.update, options.master || 'master');
+    start(branch, repositoryUri, options.update || options.single, options.master || 'master', options.single);
   })
   .allowUnknownOption()
   .on('--help',()=>{
@@ -150,7 +151,7 @@ function prepare(dir, branch, branchOrigin, update, master, repositoryUri, subdi
   return state;
 }
 
-function start(branch, repositoryUri, update, master) {
+function start(branch, repositoryUri, update, master, single) {
   // Preparing state
   console.log(chalk.green(`Starting gsync@${packageJson.version} for '${branch}' branch...`));
   let glob = {
@@ -249,13 +250,23 @@ function start(branch, repositoryUri, update, master) {
         let revision = check(`git rev-parse HEAD`);
         cp.execSync(`git checkout ${state.master}`,{stdio:'ignore'});
         console.log(chalk.green(`Switched to '${state.master}' at '${state.dir}'`))
-        if(update && revision !== state.revision) {
+        if(single && revision !== state.revision) {
           try {
             cp.execSync(`git rebase ${branch}`,{stdio:'ignore'});
+            
+            while(true) {
+              let next = check(`git log --format=%B -n 1 head~1`);
+              if(next === `gsync:auto:commit:${branch}:${state.id}`) {
+                cp.execSync(`git reset --soft head^`,{stdio:'ignore'});
+              } else {
+                cp.execSync(`git commit --amend --no-edit`,{stdio:'ignore'});
+                break;
+              }
+            }
             console.log(chalk.green(`Rebased '${state.master}' to '${branch}' at '${state.dir}'.`));
             console.log(chalk.green(`Do not forget to ${chalk.bold('--amend')} commit message.`))
           } catch(e) {
-            console.log(chalk.red(`Failed to cherry-pick commit to '${state.master}' at '${state.dir}'`))
+            console.log(chalk.red(`Failed to save commit to '${state.master}' at '${state.dir}'`))
           }          
         }
       }
