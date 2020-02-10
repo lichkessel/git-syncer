@@ -23,6 +23,7 @@ program
   .option('-p, --pull', 'pulls changes from gsync branch to master branch')
   .option('-m, --master <branch>', `counts as your local working branch to which gsync branch is relative. Default: ${chalk.bold('master')}`)
   .option('--test', 'test')
+  .option('--debug', 'debug')
   .action((branch, repositoryUri, options) => {
     let config = configuration( 
       branch, 
@@ -31,7 +32,8 @@ program
         update: options.update,
         pull: options.pull,
         master: options.master,
-        test: options.test
+        test: options.test,
+        debug: options.debug
       }
     );
     if(options.test) {
@@ -296,7 +298,9 @@ function start(config) {
       let revision = check(`git rev-parse HEAD`);
       let replace = repository.state.revision !== revision;
       cp.execSync('git add -A');
-      cp.execSync(`git commit ${replace ? '--amend' : ''} -q -m "${repository.comment}"`);
+      try {
+        cp.execSync(`git commit ${replace ? '--amend' : ''} -q -m "${repository.comment}"`);
+      } catch(e) {}      
       console.log(`committed ${chalk.yellow(`${repository.comment}`)}`);
       try {
         cp.execSync(`git push ${branchOrigin} ${branch}:master --force -q`,{stdio:'ignore'});
@@ -321,12 +325,18 @@ function start(config) {
   let commitJob;
   let watcher = chokidar.watch('.', {
     cwd: config.dir,
-    ignored: ['node_modules', '.git'],
+    ignored: [
+      '**/node_modules/**', 
+      '**/.git/**'
+    ],
     ignoreInitial: true
   })
   .on('all', (event, p) => {
     let maxCount = -1;
     let bestState = null;
+    if(config.debug) {
+      console.log(p);
+    }
     for(let repository of repositories) {
       if(p.startsWith(repository.root)) {
         if(repository.root.length > maxCount) {
