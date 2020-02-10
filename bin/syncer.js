@@ -10,12 +10,10 @@ const fs = require('fs');
 const fse = require('fs-extra');
 const packageJson = require('../package.json');
 
-let command;
-
-const program = require('commander');
+const commander = require('commander');
+const program = new commander.Command('gsync');
 
 program
-  .command('gsync')
   .version(packageJson.version)
   .arguments(`[branch] [repository-uri]`)
   .usage(`[branch] [repository-uri]
