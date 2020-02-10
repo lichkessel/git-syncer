@@ -69,6 +69,7 @@ function prepare(dir, branch, branchOrigin, update, master, repositoryUri, subdi
   let state = {
     id : dir.replace(/^.*?([^/\\]+)$/,'$1'),
     dir : dir,
+    root: subdir ? `${subdir}${path.sep}` : '',
     master: master,
     revision: check('git rev-parse HEAD'),
     containsUncommitedChanges : check('git status --porcelain'), //git diff --name-only HEAD
@@ -186,14 +187,17 @@ function start(branch, repositoryUri, update, master) {
   // Commit request
   let committing = false;
   let commitRequest;
-  function commit(dir) {
+  function commit(state) {
     if(!committing) {
       committing = true;
-      const id = dir.replace(/^.*?([^/\\]+)$/,'$1');
-      const comment = `gsync:auto:commit:${branch}:${id}`
-      process.chdir(dir);
+      
+      const comment = `gsync:auto:commit:${branch}:${state.id}`
+      process.chdir(state.dir);
+
+      let revision = check(`git rev-parse HEAD`);
+      let replace = state.revision !== revision;
       cp.execSync('git add -A');
-      cp.execSync(`git commit --amend -q -m "${comment}"`);
+      cp.execSync(`git commit ${replace ? '--amend' : ''} -q -m "${comment}"`);
       console.log(`committed ${chalk.yellow(`${comment}`)}`);
       try {
         cp.execSync(`git push ${branchOrigin} ${branch}:master --force -q`,{stdio:'ignore'});
@@ -204,7 +208,7 @@ function start(branch, repositoryUri, update, master) {
         console.log(chalk.bold(`git config --local receive.denyCurrentBranch updateInstead`))
         console.error(e);
         quit()
-      }      
+      }
       committing = false;
     } else {
       if(commitRequest) {
@@ -222,6 +226,18 @@ function start(branch, repositoryUri, update, master) {
     ignoreInitial: true
   })
   .on('all', (event, p) => {
+    let maxCount = 0;
+    let bestState = null;
+    for(let state of states) {
+      if(p.startsWith(state.root)) {
+        if(state.root.length > maxCount) {
+          maxCount = state.root.length;
+          bestState = state;
+        }
+      }
+    }
+    commit(bestState);
+
     for(let module of modules) {
       if(p.startsWith(`${module}${path.sep}`)) {
         commit(path.join(glob.dir,module));
