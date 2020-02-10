@@ -20,7 +20,7 @@ program
     Creates a ${chalk.yellow('<branch>')} which will be syncronized with repository at ${chalk.yellow('<repository-uri>')} 
     ${chalk.green(chalk.bold('Without params gsync uses parameters (not options) from previous launch'))}`)
   .option('-u, --update', 'updates your remote gsync repository to master branch state')
-  .option('-p, --pull [commit-message]', 'pulls changes from gsync branch to master branch and (optionally) commits changes')
+  .option('-p, --pull <commit-message>', 'pulls changes from gsync branch to master branch and (optionally) commits changes')
   .option('-m, --master <branch>', `counts as your local working branch to which gsync branch is relative. Default: ${chalk.bold('master')}`)
   .option('--test', 'test')
   .action((branch, repositoryUri, options) => {
@@ -216,30 +216,15 @@ function doReady( repository, config ) {
 function doPull(repository, config) {
   let { branch, branchOrigin, pull, master } = config;
   process.chdir(repository.dir);
-  let revision = check(`git rev-parse ${repository.master}`);
   try {
-    cp.execSync(`git checkout ${branch}`,{stdio:'ignore'});
-  } catch(e) {}
-  try {
-    cp.execSync(`git reset --soft ${revision}`,{stdio:'ignore'});
-    console.log(chalk.green(`Changes staged to '${repository.master}' from '${branch}'@${repository.id}`));
-    cp.execSync(`git push -u ${branchOrigin} ${branch}:master --force`,{stdio:'ignore'});
-    console.log(chalk.yellow(`Branch '${branchOrigin}/master' updated to recent '${master}'.`));
     cp.execSync(`git checkout ${repository.master}`,{stdio:'ignore'});
     console.log(chalk.green(`Switched to '${repository.master}'@${repository.id}`))
-    if(pull !== true) {
-      let hasChanges = check('git status --porcelain');
-      if(hasChanges) {
-        cp.execSync(`git commit -m "${pull}"`,{stdio:'ignore'});
-        console.log(chalk.green(`Commited with message ${chalk.bold(pull)}`)); 
-      }
-    } else{
-      console.log(chalk.yellow(`Do not forget to ${chalk.bold('git commit')} the changes.`)) 
-    }
+  } catch(e) {}
+  try {
+    cp.execSync(`git merge --squash -m "${pull}" ${branch}`);
+    console.log(chalk.green(`Changes merged successfully!`));
   } catch(e) {
-    console.log(chalk.red(`Failed to save commit to '${repository.master}'@${repository.id}`))
-    console.error(e);
-    process.exit(1)
+    console.log(chalk.red(`Resolve merge conflicts of '${repository.master}'@${repository.id} following the instructions`));
   }
 }
 
