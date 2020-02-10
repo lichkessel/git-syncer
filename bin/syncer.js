@@ -20,7 +20,7 @@ program
     Creates a ${chalk.yellow('<branch>')} which will be syncronized with repository at ${chalk.yellow('<repository-uri>')} 
     ${chalk.green(chalk.bold('Without params gsync uses parameters (not options) from previous launch'))}`)
   .option('-u, --update', 'updates your remote gsync repository to master branch state')
-  .option('-p, --pull <commit-message>', 'pulls changes from gsync branch to master branch and (optionally) commits changes')
+  .option('-p, --pull', 'pulls changes from gsync branch to master branch')
   .option('-m, --master <branch>', `counts as your local working branch to which gsync branch is relative. Default: ${chalk.bold('master')}`)
   .option('--test', 'test')
   .action((branch, repositoryUri, options) => {
@@ -221,14 +221,10 @@ function doPull(repository, config) {
     console.log(chalk.green(`Switched to '${repository.master}'@${repository.id}`))
   } catch(e) {}
   try {
-    cp.execSync(`git merge --squash -m "${pull}" ${branch}`);
-    console.log(chalk.green(`Changes merged successfully!`));
+    cp.execSync(`git merge --squash ${branch}`);
+    console.log(chalk.green(`Changes merged successfully! Do not forget to ${chalk.bold('git commit')} them.`));
   } catch(e) {
-    console.log(chalk.red(`Resolve merge conflicts of '${repository.master}'@${repository.id}:`));
-    console.log(chalk.red(`1. resolve conflicts in a text editor`));
-    console.log(chalk.red(`2. stage changes ${chalk.bold('git add -A')}`));
-    console.log(chalk.red(`3. continue merge ${chalk.bold('git merge --continue')}`));
-    console.log(chalk.red(`If you do not want to continue ${chalk.bold('git merge --abort')}. Try gsync pull again anytime.`));
+    console.log(chalk.red(`Resolve merge conflicts of '${repository.master}'@${repository.id} and ${chalk.bold('git commit')} changes.`));
   }
 }
 
