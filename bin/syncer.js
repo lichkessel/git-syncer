@@ -20,7 +20,7 @@ program.version(packageJson.version)
   .option('-u, --update', 'updates your remote gsync repository')
   .option('-m, --master <branch>', `counts as your local working branch to which gsync branch is relative. Default: ${chalk.bold('master')}`)
   .action((branch, repositoryUri, options) => {
-    start(branch, repositoryUri, options.update, options.master);
+    start(branch, repositoryUri, options.update, options.master || 'master');
   })
   .allowUnknownOption()
   .on('--help',()=>{
