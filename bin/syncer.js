@@ -67,6 +67,10 @@ function prepare(dir, branch, branchOrigin, update, master, repositoryUri, subdi
   process.chdir(dir);
   
   let state = {
+    id : dir.replace(/^.*?([^/\\]+)$/,'$1'),
+    dir : dir,
+    master: master,
+    revision: check('git rev-parse HEAD'),
     containsUncommitedChanges : check('git status --porcelain'), //git diff --name-only HEAD
     repositoryUri : check(`git config --get remote.${branchOrigin}.url`),
     remoteNameWhichBranchTracks : check(`git config --get branch.${branch}.remote`),
@@ -78,7 +82,7 @@ function prepare(dir, branch, branchOrigin, update, master, repositoryUri, subdi
     process.exit(1);
   }
 
-  console.log(chalk.green(`Configuring '${dir.replace(/^.*?([^/\\]+)$/,'$1')}'...`));
+  console.log(chalk.green(`Configuring '${state.id}'...`));
   
   if(repositoryUri) {
     if(state.repositoryUri) {
@@ -142,18 +146,18 @@ function prepare(dir, branch, branchOrigin, update, master, repositoryUri, subdi
       process.exit(1);
     }
   }
+  return state;
 }
 
 function start(branch, repositoryUri, update, master) {
   // Preparing state
   console.log(chalk.green(`Starting gsync@${packageJson.version} for '${branch}' branch...`));
-  let state = {
+  let glob = {
     dir : check('git rev-parse --show-toplevel'),
-    branch : check('git rev-parse --abbrev-ref HEAD'),
-    revision: check('git rev-parse HEAD')
+    branch : check('git rev-parse --abbrev-ref HEAD')
   }
   let branchOrigin = `${branch}_origin`;
-  let repositories = [state.dir];
+  let repositories = [glob.dir];
   let modules = [];
   try {
     modules = cp.execSync('git config --file .gitmodules --get-regexp path')
@@ -167,16 +171,17 @@ function start(branch, repositoryUri, update, master) {
   } catch(e) {}
   if(modules.length) {
     console.log(chalk.yellow(`Found submodules: ${modules.join(', ')}.`));
-    repositories.push(...(modules.map(x=>path.join(state.dir, x))));
+    repositories.push(...(modules.map(x=>path.join(glob.dir, x))));
   }
 
   // Preparing repositories
-  prepare(state.dir, branch, branchOrigin, update, master, repositoryUri);
+  let states = []
+  states.push(prepare(glob.dir, branch, branchOrigin, update, master, repositoryUri));
   for(let module of modules) {
-    prepare(state.dir, branch, branchOrigin, update, master, repositoryUri, module);
+    states.push(prepare(glob.dir, branch, branchOrigin, update, master, repositoryUri, module));
   }
 
-  console.log(chalk.yellow(`Installing watcher on '${state.dir}'...`));
+  console.log(chalk.yellow(`Installing watcher on '${glob.dir}'...`));
 
   // Commit request
   let committing = false;
@@ -212,18 +217,18 @@ function start(branch, repositoryUri, update, master) {
   // Watcher
   let commitJob;
   let watcher = chokidar.watch('.', {
-    cwd: state.dir,
+    cwd: glob.dir,
     ignored: ['node_modules', '.git'],
     ignoreInitial: true
   })
   .on('all', (event, p) => {
     for(let module of modules) {
       if(p.startsWith(`${module}${path.sep}`)) {
-        commit(path.join(state.dir,module));
+        commit(path.join(glob.dir,module));
         return;
       }
     } 
-    commit(state.dir);  
+    commit(glob.dir);  
   })
   .on('ready', () => console.log(chalk.green('Watching... Press Q to exit.')))
 
@@ -231,20 +236,21 @@ function start(branch, repositoryUri, update, master) {
   function quit() {
     watcher.close()
     .then(()=>{
-      [state.dir, ...(modules.map(x=>path.join(state.dir, x)))].forEach((dir)=>{
-        process.chdir(dir);
+      for(let state of states) {
+        process.chdir(state.dir);
         let revision = check(`git rev-parse HEAD`);
-        cp.execSync(`git checkout ${master}`,{stdio:'ignore'});
-        console.log(chalk.green(`Switched to '${master}' at '${dir}'`))
+        cp.execSync(`git checkout ${state.master}`,{stdio:'ignore'});
+        console.log(chalk.green(`Switched to '${state.master}' at '${state.dir}'`))
         if(update && revision !== state.revision) {
           try {
             cp.execSync(`git cherry-pick ${revision}`,{stdio:'ignore'});
-            console.log(chalk.green(`Cherry-picked commit to '${master}' at '${dir}'. Do not forget to --amend it.`))
+            console.log(chalk.green(`Cherry-picked commit to '${state.master}' at '${state.dir}'.`));
+            console.log(chalk.green(`Do not forget to --amend it.`))
           } catch(e) {
-            console.log(chalk.red(`Failed to cherry-pick commit to '${master}' at '${dir}'`))
+            console.log(chalk.red(`Failed to cherry-pick commit to '${state.master}' at '${state.dir}'`))
           }          
         }
-      })
+      }
       process.exit();
     })
   }
