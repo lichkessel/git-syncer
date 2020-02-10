@@ -114,7 +114,7 @@ function configuration(branch, repositoryUri, update, master, pull) {
   return config;
 }
 
-function prepare( repository, config ) {
+function doPrepare( repository, config ) {
   let { branch, branchOrigin, repositoryUri, master } = config;
   let { dir, module } = repository;
 
@@ -158,7 +158,7 @@ function prepare( repository, config ) {
   }
 }
 
-function ready( repository, config ) {
+function doReady( repository, config ) {
   let { branch, branchOrigin, update, master } = config;
   let { dir, module } = repository;
   let state = repository.state;
@@ -212,7 +212,7 @@ function ready( repository, config ) {
   }
 }
 
-function pull(repository, config) {
+function doPull(repository, config) {
   let { branch } = config;
   process.chdir(repository.dir);
   let revision = check(`git rev-parse ${repository.master}`);
@@ -265,19 +265,19 @@ function start(config) {
 
   // Preparing repositories
   for(let repository of repositories) {
-    prepare(repository, config);
+    doPrepare(repository, config);
   }
 
   if(config.pull) {
     for(let repository of repositories) {
-      pull(repository, config);
+      doPull(repository, config);
     }
     return;
   }
 
   // Ready repositories
   for(let repository of repositories) {
-    ready(repository, config);
+    doReady(repository, config);
   }
 
   console.log(chalk.yellow(`Installing watcher on '${config.dir}'...`));
