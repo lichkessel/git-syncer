@@ -224,7 +224,11 @@ function doPull(repository, config) {
     cp.execSync(`git merge --squash -m "${pull}" ${branch}`);
     console.log(chalk.green(`Changes merged successfully!`));
   } catch(e) {
-    console.log(chalk.red(`Resolve merge conflicts of '${repository.master}'@${repository.id} following the instructions`));
+    console.log(chalk.red(`Resolve merge conflicts of '${repository.master}'@${repository.id}:`));
+    console.log(chalk.red(`1. resolve conflicts in a text editor`));
+    console.log(chalk.red(`2. stage changes ${chalk.bold('git add -A')}`));
+    console.log(chalk.red(`3. continue merge ${chalk.bold('git merge --continue')}`));
+    console.log(chalk.red(`If you do not want to continue ${chalk.bold('git merge --abort')}. Try gsync pull again anytime.`));
   }
 }
 
