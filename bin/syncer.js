@@ -109,8 +109,8 @@ function configuration(branch, repositoryUri, update, master, pull) {
   for(let name in serializable) {
     config[name] = serializable[name];
   }
-  
-  config.branchOrigin = `${branch}_origin`;
+
+  config.branchOrigin = `${config.branch}_origin`;
   return config;
 }
 
