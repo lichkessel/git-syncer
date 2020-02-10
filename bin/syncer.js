@@ -106,7 +106,7 @@ function configuration(branch, repositoryUri, update, master, single) {
   return config;
 }
 
-function prepare(dir, config, subdir) {
+function prepare(dir, config, branchOrigin, subdir) {
   let {branch, repositoryUri, update, master, single} = config;
 
   dir = subdir ? path.join(dir, subdir): dir;
@@ -228,9 +228,9 @@ function start(config) {
 
   // Preparing repositories
   let states = []
-  states.push(prepare(glob.dir, config));
+  states.push(prepare(glob.dir, config, branchOrigin));
   for(let module of modules) {
-    states.push(prepare(glob.dir, config, module));
+    states.push(prepare(glob.dir, config, branchOrigin, module));
   }
 
   console.log(chalk.yellow(`Installing watcher on '${glob.dir}'...`));
