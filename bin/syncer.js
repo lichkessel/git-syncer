@@ -78,6 +78,7 @@ function prepare(dir, branch, branchOrigin, update, master, repositoryUri, subdi
     remoteNameWhichBranchTracks : check(`git config --get branch.${branch}.remote`),
     branchExists : check(`git rev-parse --verify ${branch}`,{stdio:['pipe','pipe','ignore']})
   }
+  state.comment = `gsync:auto:commit:${branch}:${state.id}`;
 
   if(state.containsUncommitedChanges) {
     console.log(chalk.red(`The directory contains uncommited changes. Commit them and try again.`));
@@ -191,15 +192,12 @@ function start(branch, repositoryUri, update, master, single) {
   function commit(state) {
     if(!committing) {
       committing = true;
-
-      const comment = `gsync:auto:commit:${branch}:${state.id}`
       process.chdir(state.dir);
-
       let revision = check(`git rev-parse HEAD`);
       let replace = state.revision !== revision;
       cp.execSync('git add -A');
-      cp.execSync(`git commit ${replace ? '--amend' : ''} -q -m "${comment}"`);
-      console.log(`committed ${chalk.yellow(`${comment}`)}`);
+      cp.execSync(`git commit ${replace ? '--amend' : ''} -q -m "${state.comment}"`);
+      console.log(`committed ${chalk.yellow(`${state.comment}`)}`);
       try {
         cp.execSync(`git push ${branchOrigin} ${branch}:master --force -q`,{stdio:'ignore'});
         console.log(`pushed to ${chalk.yellow(`${branchOrigin}`)}`);
@@ -253,10 +251,9 @@ function start(branch, repositoryUri, update, master, single) {
         if(single && revision !== state.revision) {
           try {
             cp.execSync(`git rebase ${branch}`,{stdio:'ignore'});
-            
             while(true) {
               let next = check(`git log --format=%B -n 1 head~1`);
-              if(next === `gsync:auto:commit:${branch}:${state.id}`) {
+              if(next === state.comment) {
                 cp.execSync(`git reset --soft head^`,{stdio:'ignore'});
               } else {
                 cp.execSync(`git commit --amend --no-edit`,{stdio:'ignore'});
