@@ -226,7 +226,7 @@ function start(branch, repositoryUri, update, master) {
     ignoreInitial: true
   })
   .on('all', (event, p) => {
-    let maxCount = 0;
+    let maxCount = -1;
     let bestState = null;
     for(let state of states) {
       if(p.startsWith(state.root)) {
