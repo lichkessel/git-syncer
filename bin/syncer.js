@@ -299,7 +299,7 @@ function start(config) {
       let replace = repository.state.revision !== revision;
       cp.execSync('git add -A');
       try {
-        cp.execSync(`git commit ${replace ? '--amend' : ''} -q -m "${repository.comment}"`);
+        cp.execSync(`git commit ${replace ? '--amend' : ''} --allow-empty -q -m "${repository.comment}"`);
       } catch(e) {}      
       console.log(`committed ${chalk.yellow(`${repository.comment}`)}`);
       try {
